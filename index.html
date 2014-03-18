@@ -1,5 +1,5 @@
 <head><title>Backend Documentation</title><link rel="stylesheet" href="css/doc.css"></head>
-<h1 id="backend-documentation">Backend Documentation</h1>
+<h1 id="-backend-img-logo-png-backend-documentation"><img src="img/logo.png" alt="Backend"> Backend Documentation</h1>
 <h2 id="table-of-contents">Table of contents</h2>
 <ul>
 <li><a href="#backend-framework-for-node-js"> Backend framework for node.js</a></li>
@@ -1512,6 +1512,12 @@ the callback MUST return data back to the client or any other status code</li>
 <ul>
 <li><p><code>api.handleIcon(req, res, op, options)</code></p>
 <p> Process icon request, put or del, update table and deal with the actual image data, always overwrite the icon file</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>api.formatIcon(req, id, row)</code></p>
+<p> Return formatted icon URL for the given account</p>
 </li>
 </ul>
 
