@@ -2663,9 +2663,11 @@ due to some error.</p>
 <li><p><code>db.query(req, options, callback)</code></p>
 <p> Execute query using native database driver, the query is passed directly to the driver.</p>
 <ul>
-<li>req - can be a string or an object with the following properties:</li>
+<li>req - can be a string or an object with the following properties:<ul>
 <li>text - SQL statement or other query in the format of the native driver, can be a list of statements</li>
 <li>values - parameter values for sql bindings or other driver specific data</li>
+</ul>
+</li>
 <li>options may have the following properties:<ul>
 <li>filter - function to filter rows not to be included in the result, return false to skip row, args are: (row, options)
 Callback is called with the following params:</li>
