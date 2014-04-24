@@ -2,8 +2,9 @@
 <h1 id="-backend-img-logo-png-backend-documentation"><img src="img/logo.png" alt="Backend"> Backend Documentation</h1>
 <h2 id="table-of-contents">Table of contents</h2>
 <ul>
-<li><a href="#backend-framework-for-node-js"> Backend framework for node.js</a></li>
-<li><a href="#installation-not-available-yet-"> Installation (Not available yet)</a></li>
+<li><a href="#backend-js-framework-for-node-js"> Backend.js framework for node.js</a></li>
+<li><a href="#requirements-and-dependencies"> Requirements and dependencies</a></li>
+<li><a href="#installation"> Installation</a></li>
 <li><a href="#quick-start"> Quick start</a></li>
 <li><a href="#database-schema-definition"> Database schema definition</a></li>
 <li><a href="#api-endpoints-provided-by-the-backend"> API endpoints provided by the backend</a><ul>
@@ -20,6 +21,12 @@
 </li>
 <li><a href="#backend-directory-structure"> Backend directory structure</a></li>
 <li><a href="#internal-backend-functions"> Internal backend functions</a></li>
+<li><a href="#cache-configurations"> Cache configurations</a><ul>
+<li><a href="#internal-with-nanomsg"> Internal with nanomsg</a></li>
+</ul>
+</li>
+<li><a href="#memcached"> memcached</a></li>
+<li><a href="#redis"> Redis</a></li>
 <li><a href="#pub-sub-configurations"> PUB/SUB configurations</a><ul>
 <li><a href="#internal-with-nanomsg"> Internal with nanomsg</a></li>
 <li><a href="#redis"> Redis</a></li>
@@ -27,12 +34,16 @@
 </li>
 <li><a href="#security-configurations"> Security configurations</a><ul>
 <li><a href="#api-only"> API only</a></li>
-<li><a href="#secure-web-site-client-verificastion"> Secure Web site, client verificastion</a></li>
+<li><a href="#secure-web-site-client-verification"> Secure Web site, client verification</a></li>
 <li><a href="#secure-web-site-backend-verification"> Secure Web site, backend verification</a></li>
 </ul>
 </li>
 <li><a href="#the-backend-provisioning-utility-rc-backend"> The backend provisioning utility: rc.backend</a></li>
-<li><a href="#deployment-use-cases"> Deployment use cases</a></li>
+<li><a href="#deployment-use-cases"> Deployment use cases</a><ul>
+<li><a href="#aws-instance-setup"> AWS instance setup</a></li>
+<li><a href="#configure-http-port"> Configure HTTP port</a></li>
+</ul>
+</li>
 <li><a href="#security"> Security</a></li>
 <li><a href="#backend-framework-development-mac-os-x-developers-"> Backend framework development (Mac OS X, developers)</a></li>
 <li><a href="#author"> Author</a></li>
@@ -47,33 +58,56 @@
 </ul>
 </li>
 </ul>
-<h1 id="backend-framework-for-node-js">Backend framework for node.js</h1>
+<h1 id="backend-js-framework-for-node-js">Backend.js framework for node.js</h1>
 <p>General purpose backend framework.</p>
 <p>Features:</p>
 <ul>
 <li>Exposes a set of Web service APIs over HTTP(S) using Express framework.</li>
-<li>Supports Sqlite, PostgreSQL, MySQL, DynamoDB, Cassandra, LevelDB, LMDB databases, easily extendable to support any kind of database.</li>
+<li>Supports Sqlite, PostgreSQL, MySQL, DynamoDB, Cassandra, LevelDB, MongoDB, LMDB databases, easily extendable to support any kind of database.</li>
 <li>Provides accounts, connections, locations, messaging and icons APIs with basic functionality for a qucik start.</li>
 <li>Supports crontab-like and on-demand scheduling for local and remote(AWS) jobs.</li>
 <li>Authentication is based on signed requests using API key and secret, similar to Amazon AWS signing requests.</li>
 <li>Runs web server as separate processes to utilize multiple CPU cores.</li>
 <li>Local jobs are executed by spawned processes</li>
 <li>Supports several cache modes(Redis, memcached, local cache) for the database operations.</li>
-<li>Supports several PUB/SUB modes of operatios using nanomsg, Redis, RabbitMQ.</li>
+<li>Supports several PUB/SUB modes of operatios using nanomsg, Redis.</li>
 <li>Supports common database operations (Get, Put, Del, Update, Select) for all databases using the same DB API.</li>
 <li>ImageMagick is compiled as C++ module for in-process image scaling.</li>
 <li>nanomsg interface for messaging between processes and servers.</li>
 <li>REPL(command line) interface for debugging and looking into server internals.</li>
 <li>Geohash based location searches supported by all databases drivers.</li>
 </ul>
-<p>Check out the <a href="http://vseryakov.github.io/backend/">Documentation</a> for more documentation.</p>
-<h1 id="installation-not-available-yet-">Installation (Not available yet)</h1>
-<pre><code>    npm install backend
-</code></pre><p>This may take some time because of compiling required dependencies like ImageMagick, nanomsg and LevelDB. They are not required in all
+<p>Check out the <a href="http://vseryakov.github.io/backendjs/">Documentation</a> for more documentation.</p>
+<h1 id="requirements-and-dependencies">Requirements and dependencies</h1>
+<p>The module supports several databases and includes ImageMagick interface so in order for such interfaces to be compiled the software must be installed
+on the system before installing the backendjs. Not everything is required, if not available the interface will be skipped.</p>
+<p>The optional packages that the backendjs may use if available, resolving packages is done with pkg-config:</p>
+<ul>
+<li>nanomsg - messaging, caching and pub/sub services</li>
+<li>ImageMagick - image manipulation</li>
+<li>libpq - PostgreSQL database driver</li>
+<li>libmysql - MySQL database driver</li>
+</ul>
+<p>Installing dependencies on CentOS:</p>
+<pre><code>    yum -y install libpng-devel libjpeg-turbo-devel postgresql-devel mysql-devel
+</code></pre><p>Installing dependencies on Mac OS X using macports:</p>
+<pre><code>    port install libpng jpeg tiff mysql56 postgresql93
+</code></pre><h1 id="installation">Installation</h1>
+<p>To install the module with all optional dependencies if they are available in the system</p>
+<p>Note: if for example ImageMagick is not istalled it will be skipped, same goes to all database drivers(PostgreSQL, MySQL) and nanomsg.</p>
+<pre><code>    npm install backendjs
+</code></pre><p>To force internal nanomsg and ImageMagick to be compiled the following command must be used:</p>
+<pre><code>    npm install backendjs --backend_deps_force
+</code></pre><p>This may take some time because of compiling required dependencies like ImageMagick, nanomsg. They are not required in all
 applications but still part of the core of the system to be available once needed.</p>
 <h1 id="quick-start">Quick start</h1>
 <ul>
-<li><p>Run default backend without any custom extensions, by default it will use embedded Sqlite database and listen on port 8000</p>
+<li><p>Simplest way of using the backendjs, it will start the server listening on port 8000</p>
+<pre><code>  # node
+  &gt; var bk = require(&#39;backendjs&#39;)
+  &gt; bk.server.start()
+</code></pre></li>
+<li><p>Same but using the helper tool, by default it will use embedded Sqlite database and listen on port 8000</p>
 <pre><code>  rc.backend run-backend
 </code></pre></li>
 <li><p>Documentation is always available when the backend Web server is running at <a href="http://localhost:8000/doc.html">http://localhost:8000/doc.html</a></p>
@@ -85,7 +119,7 @@ For this example let&#39;s create couple of accounts, type and execute the follo
 </code></pre></li>
 </ul>
 <ul>
-<li>Now login with any of the accounts above, click on Login at the top-right corner and enter email and secret in the login popup dialog.</li>
+<li>Now login with any of the accounts above, click on Login at the top-right corner and enter login and secret in the login popup dialog.</li>
 <li><p>If no error message appeared after the login, try to get your current account details:</p>
 <pre><code>  /account/get
 </code></pre></li>
@@ -139,9 +173,9 @@ necessary, all new columns will be detected and the database tables updated acco
 to maintain database tables.</p>
 </li>
 </ul>
-<p>Each database may restrict how the schema is defined and used, the db layer does not provide an artificial layer hidning all specific, it just provides the same
+<p>Each database may restrict how the schema is defined and used, the db layer does not provide an artificial layer hiding all specifics, it just provides the same
 API and syntax, for example, DynamoDB tables must have only hash primary key or combined hash and range key, so when creating table to be used with DynamoDB, only
-one or two columns can be marked with primary property while for SQL databases the composite primary key can conisist more than 2 columns.</p>
+one or two columns can be marked with primary property while for SQL databases the composite primary key can conisit of more than 2 columns.</p>
 <h1 id="api-endpoints-provided-by-the-backend">API endpoints provided by the backend</h1>
 <h2 id="accounts">Accounts</h2>
 <p>The accounts API manages accounts and authentication, it provides basic user account features with common fields like email, name, address.</p>
@@ -179,7 +213,7 @@ specify in the command line. More complex ways to perform registration will requ
 for example with invitation codes....</p>
 <p>In the table <code>bk_auth</code>, the column type is used to distinguish between account roles, by default only account with type <code>admin</code> can
 add other accounts with this type specified, this column can also be used in account permissions implementations. Because it is in the bk_auth table,
-all columns of this table are avaailable as <code>req.account</code> object after the successful authentication where req is Express request object used in the middleware
+all columns of this table are available as <code>req.account</code> object after the successful authentication where req is Express request object used in the middleware
 parameters.</p>
 <p><em>Note: secret and login can be anything, the backend does not require any specific formats so one simple trick which is done by the
 backend Web client is to scramble login/secret using HMAC-SHA1 and keep them in the local storage, this way the real login and secret is never exposed but
@@ -187,11 +221,19 @@ the login popup will still asking for real name, see backend.js in the web/js fo
 <p>Example:</p>
 <pre><code>      /account/add?name=test&amp;login=test@test.com&amp;secret=test123&amp;gender=f&amp;phone=1234567
 </code></pre></li>
+</ul>
+<p>  How to make an account as admin</p>
+<pre><code>        # Run backend shell
+        rc.backend run-shell
+
+        # Update record by login
+        &gt; db.update(&quot;bk_auth&quot;, { login: &#39;login@name&#39;, type: &#39;admin&#39; });
+</code></pre><ul>
 <li><p><code>/account/select</code></p>
 <p>Return list of accounts by the given condition, calls <code>db.select</code> for bk_account table. Parameters are the column values to be matched and
 all parameters starting with underscore are control parameters that goes into options of the <code>db.select</code> call with underscore removed. This will work for SQL
 databases only because DynamoDB or Cassandra will not search by non primary keys. In the DynamoDB case this will run ScanTable action which will be very expensive for
-large tables.</p>
+large tables. Supports special query parameters <code>_select,_keys,_ops</code>, see docs about <code>db.select</code> for more info.</p>
 <p>Example:</p>
 <pre><code>      /account/search?email=test&amp;_ops=email,begins_with
       /account/search?name=test&amp;_keys=name
@@ -204,7 +246,6 @@ large tables.</p>
                       &quot;name&quot;: &quot;User1&quot;,
                       &quot;mtime&quot;: 1391824028,
                       &quot;login&quot;: &quot;test1&quot;,
-                      &quot;icon1&quot;: &quot;/image/account/57d07a4e28fc4f33bdca9f6c8e04d6c3/1&#39;&quot;
                     },
                     {
                       &quot;id&quot;: &quot;57d07a4e2824fc43bd669f6c8e04d6c3&quot;,
@@ -212,7 +253,6 @@ large tables.</p>
                       &quot;name&quot;: &quot;User2&quot;,
                       &quot;mtime&quot;: 1391824028,
                       &quot;login&quot;: &quot;test2&quot;,
-                      &quot;icon1&quot;: &quot;/image/account/57d07a4e2824fc43bd669f6c8e04d6c3/1&#39;&quot;
                     }],
             &quot;next_token&quot;: &quot;&quot;
         }
@@ -240,7 +280,7 @@ large tables.</p>
 <p>Subscribe to account events delivered via HTTP Long Poll, a client makes the connection and waits for events to come, whenever
 somebody updates the account&#39;s counter or send a message or creates a connection to this account the event about it will be sent to this HTTP
 connection and delivered as JSON object. This is not a persistent queue so if not listening, all events will just be ignored, only events published
-since the connect will be delivered. To specify what kind of events needs to be delivered, <code>match</code> query partameters can be specified which is a
+since the connect will be delivered. To specify what kind of events needs to be delivered, <code>match</code> query parameter can be specified which is a
 RegExp of the whole event body string.</p>
 <p><em>Note: On the server side there is a config parameter <code>subscribeInterval</code> which defines how often to deliver notifications, by default it is 5 seconds which means
 only every 5 seconds new events will be delivered to the Web client, if more than one event happened, they all accumulate and will be sent as a JSON list.</em></p>
@@ -250,9 +290,9 @@ only every 5 seconds new events will be delivered to the Web client, if more tha
 </code></pre></li>
 </ul>
 <p>  Response:</p>
-<pre><code>    [ { &quot;path&quot;: &quot;/message/add&quot;, &quot;mtime:&quot; 1234566566, &quot;sender&quot;: &quot;23545666787&quot; },
-      { &quot;path&quot;: &quot;/counter/incr&quot;, &quot;mtime:&quot; 1234566566, &quot;data&quot;: { &quot;like&quot;: 1, &quot;invite&quot;: 1 } },
-      { &quot;path&quot; : &quot;/connection/add&quot;, &quot;mtime&quot;: 1223345545, &quot;type&quot;: &quot;like&quot;, &quot;id&quot;: &quot;123456789&quot; } ]
+<pre><code>    [ { &quot;path&quot;: &quot;/message/add&quot;, &quot;mtime:&quot; 1234566566, &quot;type&quot;: &quot;1&quot; },
+      { &quot;path&quot;: &quot;/counter/incr&quot;, &quot;mtime:&quot; 1234566566, &quot;type&quot;: &quot;like,invite&quot; } },
+      { &quot;path&quot;: &quot;/connection/add&quot;, &quot;mtime&quot;: 1223345545, &quot;type&quot;: &quot;like&quot; } ]
 </code></pre><ul>
 <li><p><code>/account/select/icon</code></p>
 <p>Return a list of available account icons, icons that have been uploaded previously with /account/put/icon calls. The <code>url</code> property is an URL to retrieve this particular icon.</p>
@@ -300,7 +340,7 @@ for JSON the Content-Type HTTP headers must be set to <code>application/json</co
 </li>
 <li>_width - desired width of the stored icon, if negative this means do not upscale, if th eimage width is less than given keep it as is</li>
 <li>_height - height of the icon, same rules apply as for the width above</li>
-<li>_ext - image file format, default is jpg, supports: gif, png, jpg</li>
+<li>_ext - image file format, default is jpg, supports: gif, png, jpg, jp2</li>
 </ul>
 <p>Example:</p>
 <pre><code>  /account/put/icon?type=1&amp;icon=iVBORw0KGgoAAAANSUhEUgAAAAcAAAAJCAYAAAD+WDajAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwgAADs....
@@ -336,14 +376,19 @@ Example:
     #Return icons for account 12345 for types 0 and 1
 </code></pre><h2 id="icons">Icons</h2>
 <p>The icons API provides ability for an account to store icons of different types. Each account keeps its own icons separate form other
-accounts, within the account icons can be separated by <code>prefix</code> which is just a name assigned to the icons set, for example to keep messages
-icons separate from albums, or use prefix for each separate album. Within the prefix icons can be assigned with unique id which can be any string.</p>
+accounts, within the account icons can be separated by <code>prefix</code> which is just a namespace assigned to the icons set, for example to keep messages
+icons separate from albums, or use prefix for each separate album. Within the prefix icons can be assigned with unique type which can be any string.</p>
+<p>Prefix and type can consist from alphabetical characters and numbers, dots, underscores and dashes: [a-z0-9._-]. This means, they are identificators, not real titles or names,
+a special mapping between prefix/type and album titles for example needs to be created separately.</p>
+<p>The supposed usage for type is to concatenate common identifiers first with more specific to form unique icon type which later can be queried
+by prefix or exactly by icon type. For example album id can be prefixed first, then sequential con number like album1:icon1, album1:icon2....
+then retrieving all icons for an album would be only query with album1: prefix.</p>
 <ul>
 <li><code>/icon/get/prefix</code></li>
 <li><p><code>/icon/get/prefix/type</code></p>
 <p> Return icon for the current account in the given prefix, icons are kept on the local disk in the directory
  configured by -api-images-dir parameter(default is images/ in the backend directory). Current account id is used to keep icons
- separate from other accounts. If <code>type</code> is used to specify any unique icon created with such type which can be any string.</p>
+ separate from other accounts. <code>type</code> is used to specify unique icon created with such type which can be any string.</p>
 </li>
 <li><p><code>/icon/put/prefix</code></p>
 </li>
@@ -352,6 +397,8 @@ icons separate from albums, or use prefix for each separate album. Within the pr
 multiple icons for the same prefix. <code>type</code> can be any string consisting from alpha and digits characters.</p>
 <p>The following parameters can be used:</p>
 <ul>
+<li>descr - optional description of the icon</li>
+<li>latitude, longitude - optional coordinates for the icon</li>
 <li>acl_allow - allow access permissions, see <code>/account/put/icon</code> for the format and usage</li>
 <li>_width - desired width of the stored icon, if negative this means do not upscale, if th eimage width is less than given keep it as is</li>
 <li>_height - height of the icon, same rules apply as for the width above</li>
@@ -370,9 +417,12 @@ Return list of available icons for the given prefix adn type, all icons starting
 the <code>url</code> property will provide full URL to retrieve the icon contents</p>
 <p>Example:</p>
 <pre><code>  /icon/select/album/me
-</code></pre><p>Response:</p>
-<pre><code>  [ { id: &#39;b3dcfd1e63394e769658973f0deaa81a&#39;, type: &#39;me1&#39;, icon: &#39;/icon/get/album/me1&#39; },
-    { id: &#39;b3dcfd1e63394e769658973f0deaa81a&#39;, type: &#39;me2&#39;, icon: &#39;/icon/get/album/me2&#39; } ]
+  /icon/select/album/12345
+</code></pre><p>Responses:</p>
+<pre><code>  [ { id: &#39;b3dcfd1e63394e769658973f0deaa81a&#39;, type: &#39;me-1&#39;, icon: &#39;/icon/get/album/me1&#39; },
+    { id: &#39;b3dcfd1e63394e769658973f0deaa81a&#39;, type: &#39;me-2&#39;, icon: &#39;/icon/get/album/me2&#39; } ]
+
+  [ { id: &#39;b3dcfd1e63394e769658973f0deaa81a&#39;, type: &#39;12345-f0deaa81a&#39;, icon: &#39;/icon/get/album/12345-f0deaa81a&#39; } ]
 </code></pre></li>
 </ul>
 <h2 id="connections">Connections</h2>
@@ -386,7 +436,7 @@ Create or replace a connection between two accounts, required parameters are:</p
 <ul>
 <li><code>id</code> - id of account to connect to</li>
 <li><code>type</code> - type of connection, like,dislike,....</li>
-<li>_connected - the reply will contain a property connected set to 1 if the other side of our connection is connected to me as well</li>
+<li>_connected - the reply will contain a property <code>connected</code> set to 1 if the other side of our connection is connected to us as well</li>
 </ul>
 <p>This call automatically creates a record in the bk_reference table which is reversed connection for easy access to information like
 &#39;&#39;who is connected to me&#39;&#39; and auto-increment like0, like1 counters for both accounts in the bk_counter table.</p>
@@ -402,12 +452,13 @@ the type of the connection.</p>
 <pre><code>  /connection/update?id=12345&amp;type=invite&amp;state=accepted
 </code></pre></li>
 <li><p><code>/connection/del</code>
-Delete existing connection, <code>id</code> and <code>type</code> must be specified, mass-deletion is not supported only one conection by one.</p>
+Delete existing connection(s), <code>id</code> and/or <code>type</code> may be be specified, if not all existing connections will be deleted.</p>
 <p>Example:</p>
 <pre><code>  /connection/del?type=invite&amp;id=12345
 </code></pre></li>
 <li><p><code>/connection/get</code>
-Receive all my connections of the given type, i.e. connection(s) i made, if <code>id</code> is given only one record for the specified connection will be returned</p>
+Receive all my connections of the given type, i.e. connection(s) i made, if <code>id</code> is given only one record for the specified connection will be returned. Supports special
+query parameters <code>_select,_keys,_ops</code>, see docs about <code>db.select</code> for more info.</p>
 <p>Example:</p>
 <pre><code>  /connection/get?type=invite             - return all accounts who i invited
   /connection/get?type=invite&amp;id=12345
@@ -423,30 +474,13 @@ Receive all my connections of the given type, i.e. connection(s) i made, if <cod
 <li><p><code>/reference/get</code>
 Receive all references that connected with my account, i.e. connections made by somebody else with me, works the same way as for connection query call</p>
 <p>Example:</p>
-<pre><code>  /reference/get?type=invite              - return all accounts who invited me
+<pre><code>  # Return all accounts who invited me
+  /reference/get?type=invite
+  # Return accounts who invited me after specified mtime
+  /reference/get?type=invite&amp;_keys=id,type,mtime&amp;_ops=mtime,gt&amp;mtime=12334312543
 </code></pre><p>Response:</p>
 <pre><code>  { &quot;data&quot;: [ { &quot;id&quot;: &quot;57d07a4e28fc4f33bdca9f6c8e04d6c3&quot;,
                 &quot;type&quot;: &quot;invite&quot;,
-                &quot;status&quot;: &quot;&quot;,
-                &quot;mtime&quot;: &quot;12334312543&quot;
-            }],
-    &quot;next_token&quot;: &quot;&quot;
-  }
-</code></pre></li>
-<li><p><code>/connection/recent</code>
-Return all connections made since the given time, parameter <code>mtime</code> defiens the point in time which connections have been made after this time, this is for
-fast retrieval only recent connections without pulling a long list every time to see who connected. This requires for the client to maintain the timestamp of the last
-request and update it with the mtime from the most recent connection.</p>
-<p>Example:</p>
-<pre><code>  /connection/recent?mtime=1392185596577
-</code></pre><p>Response:</p>
-<pre><code>  { &quot;data&quot;: [ { &quot;id&quot;: &quot;12345&quot;,
-                &quot;type&quot;: &quot;invite&quot;,
-                &quot;status&quot;: &quot;&quot;,
-                &quot;mtime&quot;: &quot;12334312543&quot;
-            },
-            { &quot;id&quot;: &quot;45678&quot;,
-                &quot;type&quot;: &quot;like&quot;,
                 &quot;status&quot;: &quot;&quot;,
                 &quot;mtime&quot;: &quot;12334312543&quot;
             }],
@@ -504,13 +538,26 @@ Return the image data for the given message, the required parameters are:</p>
 </ul>
 </li>
 <li><p><code>/message/get</code>
-Receive messages, the parameter <code>mtime</code> defines which mesages to get, if omitted all messages will be returned. By <code>mtime</code> it is possible to
+Receive messages, the parameter <code>mtime</code> defines which messages to get, if omitted all messages will be returned. By <code>mtime</code> it is possible to
 specify that only messages received since that time to return, it must be in milliseconds since midnight GMT on January 1, 1970, this is what
 Date.now() return in Javascript. The images are not returned, only link to the image in <code>icon</code> property of reach record,
 the actual image data must be retrieved separately.</p>
+<p>When <code>sender</code> is specified then all messages for given sender will be returned.</p>
+<p>NOTE: The <code>mtime</code> is when the backend server received the message, if client and the server clocks are off this may return wrong data or not return anything at all,
+also because the arrival order of the messages cannot be guaranteed, sending fast multiple messages may be received in different order by the backend and this will
+result in mtimes that do not correspond to actual times when the message has been sent.</p>
 <p>Example:</p>
-<pre><code>  /message/get
+<pre><code>  # Get all messages
+  /message/get
+
+  # Get all messages received after given mtime
   /message/get?mtime=123475658690
+
+  # Get all messages with custom filter: if msg text contains Hi
+  /message/get?_keys=id,mtime,msg&amp;_ops=msg,iregexp&amp;msg=Hi
+
+  # Get all messages for specific sender
+  /message/get?sender=12345
 </code></pre><p>Response:</p>
 <pre><code>  { &quot;data&quot;: [ { &quot;sender&quot;: &quot;12345&quot;,
                 &quot;msg&quot;: &quot;Hi, how r u?&quot;,
@@ -524,6 +571,15 @@ the actual image data must be retrieved separately.</p>
        &quot;next_token&quot;: &quot;&quot;
      }
 </code></pre></li>
+<li><p><code>/message/get/unread</code>
+Read all unread messages, i.e. the messages that never been issued <code>/message/read</code> call.</p>
+<p>Parameters:</p>
+<ul>
+<li><code>_read</code> - if set to 1, all returned messages will be marked as read automatically, so no individual /message/read call needed</li>
+</ul>
+</li>
+</ul>
+<ul>
 <li><p><code>/message/add</code>
 Send a message to an account, the following parametrrs must be specified:</p>
 <ul>
@@ -543,7 +599,7 @@ Mark a message as read, this will update account counter <code>msg_read</code> a
 <pre><code>  /message/read?sender=12345&amp;mtime=12366676434
 </code></pre></li>
 <li><p><code>/message/del</code>
-Delete the message by <code>sender</code> and <code>mtime</code> which must be passed as query parameters.</p>
+Delete the message by <code>sender</code> and/or <code>mtime</code> which must be passed as query parameters. If no mtime is given, all messages from the given sender will be deleted.</p>
 <p>Example:</p>
 <pre><code>  /message/del?sender=12345&amp;mtime=124345656567676
 </code></pre></li>
@@ -617,6 +673,33 @@ Database pool statistics and other diagnostics</p>
 </ul>
 </li>
 <li>api - Web requests metrics, same structure as for the db pool metrics</li>
+</ul>
+<p>Individual sub-objects:</p>
+<ul>
+<li>rate or meter - Things that are measured as events / interval.<ul>
+<li>mean: The average rate since the meter was started.</li>
+<li>count: The total of all values added to the meter.</li>
+<li>currentRate: The rate of the meter since the last toJSON() call.</li>
+<li>1MinuteRate: The rate of the meter biased towards the last 1 minute.</li>
+<li>5MinuteRate: The rate of the meter biased towards the last 5 minutes.</li>
+<li>15MinuteRate: The rate of the meter biased towards the last 15 minutes.</li>
+</ul>
+</li>
+<li>queue or histogram - Keeps a resevoir of statistically relevant values biased towards the last 5 minutes to explore their distribution<ul>
+<li>min: The lowest observed value.</li>
+<li>max: The highest observed value.</li>
+<li>sum: The sum of all observed values.</li>
+<li>variance: The variance of all observed values.</li>
+<li>mean: The average of all observed values.</li>
+<li>stddev: The stddev of all observed values.</li>
+<li>count: The number of observed values.</li>
+<li>median: 50% of all values in the resevoir are at or below this value.</li>
+<li>p75: See median, 75% percentile.</li>
+<li>p95: See median, 95% percentile.</li>
+<li>p99: See median, 99% percentile.</li>
+<li>p999: See median, 99.9% percentile.</li>
+</ul>
+</li>
 </ul>
 <p>Response:</p>
 <pre><code>   {
@@ -833,8 +916,12 @@ regular parameters are the table columns.</p>
   db-dynamodb-pool=http://localhost:9000
   db-pgsql-pool=postgresql://postgres@127.0.0.1/backend
 
-  To specify other config file: rc.backend run-app -config-file file
+  To specify other config file: rc.backend run-backend -config-file file
 </code></pre></li>
+<li><p>some config parameters can be condigured in DNS as TXT records, the backend on startup will try to resolve such records and use the value if not empty.
+All params that  marked with DNS TXT can be configured in the DNS server for the domain where the backend is running, the config parameter name is
+concatenated with the domain and queried for the TXT record, for example: <code>lru-host</code> parameter will be queried for lru-host.domain.name for TXT record type.</p>
+</li>
 <li><p><code>etc/crontab</code> - jobs to be run with intervals, local or remote, JSON file with a list of cron jobs objects:</p>
 <p>  Example:</p>
 <ol>
@@ -842,14 +929,14 @@ regular parameters are the table columns.</p>
 <pre><code> [ { &quot;type&quot;: &quot;local&quot;, &quot;cron&quot;: &quot;0 1 1 * * 1,3&quot;, &quot;job&quot;: { &quot;api.cleanSessions&quot;: { &quot;interval&quot;: 3600000 } } } ]
 </code></pre></li>
 <li><p>Define the funtion that the cron will call with the options specified, callback must be called at the end, create this app.js file</p>
-<pre><code> var backend = require(&quot;backend&quot;);
+<pre><code> var backend = require(&quot;backendjs&quot;);
  backend.api.cleanSessions = function(options, callback) {
       backend.db.del(&quot;session&quot;, { mtime: options.interval + Date.now() }, { ops: &quot;le&quot;, keys: [ &quot;mtime&quot; ] }, callback);
  }
  backend.server.start()
 </code></pre></li>
 <li><p>Start the scheduler and the web server at once</p>
-<pre><code> rc.backend run-app -master -web
+<pre><code> rc.backend run-backend -master -web
 </code></pre></li>
 </ol>
 </li>
@@ -878,7 +965,7 @@ regular parameters are the table columns.</p>
 <h1 id="internal-backend-functions">Internal backend functions</h1>
 <p>The backend includes internal C++ module which provide some useful functions available in the Javascript. The module is exposed as &quot;backend&quot; submodule, to see
 all functions for example run the below:</p>
-<pre><code>var backend = require(&#39;backend&#39;);
+<pre><code>var backend = require(&#39;backendjs&#39;);
 console.log(backend.backend)
 </code></pre><p>List of available functions:</p>
 <ul>
@@ -890,15 +977,15 @@ console.log(backend.backend)
 <li>splitArray(str) - split a string into an array separated by commas, supports double quotes</li>
 <li>logging([level]) - set or return logging level, this is internal C++ logging facility</li>
 <li>loggingChannel(channelname) - redirect logging into stdout or stderr, this is internal C++ logging</li>
-<li>countWordsInit()</li>
-<li>countWords()</li>
-<li>countAllWords()</li>
+<li>countWords(word, text) - return how many time word appers in the text, uses Knuth-Morris-Pratt algorithm</li>
+<li>countAllWords(list, text) - return an object with counters for each word from the list, i.e. how many times each word appears in the text, uses Aho-Corasick algorithm</li>
+<li>countWordsInit() - clears word counting cache</li>
 <li><p>resizeImage(source, options, callback) - resize image using ImageMagick,</p>
 <ul>
 <li>source can be a Buffer or file name</li>
 <li>options can have the following properties:<ul>
-<li>width - output image width</li>
-<li>height - output image height</li>
+<li>width - output image width, if negative and the original image width is smaller than the specified, nothing happens</li>
+<li>height - output image height, if negative and the original image height is smaller this the specified, nothing happens</li>
 <li>quality - 0 -99</li>
 <li>out - output file name</li>
 <li>ext - image extention</li>
@@ -910,7 +997,6 @@ console.log(backend.backend)
 </li>
 <li>snappyCompress(str) - compress a string</li>
 <li>snappyUncompress(str) - decompress a string</li>
-<li>uuid() - return a new UUID</li>
 <li>geoDistance(lat1, lon1, lat2, lon2) - return distance between 2 coordinates in km</li>
 <li>geoBoundingBox(lat, lon, distance) - return bounding box geohash for given point around distance</li>
 <li>geoHashEncode(lat, lon, len) - return geohash for given coordinate, len defines number of bytesin geohash</li>
@@ -918,7 +1004,7 @@ console.log(backend.backend)
 <li>geoHashAdjacent()</li>
 <li>geoHashGrid()</li>
 <li>geoHashRow()</li>
-<li>cacheSave()</li>
+<li>cacheSave() - general purpose caching functions that have no memory limits and do not use V8 heap</li>
 <li>cacheSet()</li>
 <li>cacheGet()</li>
 <li>cacheDel()</li>
@@ -942,18 +1028,93 @@ console.log(backend.backend)
 <li>lruKeys() - return all cache key names</li>
 <li>lruClear() - clear LRU cache</li>
 <li>lruServer()</li>
-<li>syslogInit(name, priority, facility)</li>
+<li>syslogInit(name, priority, facility) - initialize syslog client, used by the logger module</li>
 <li>syslogSend(level, text)</li>
 <li>syslogClose()</li>
 <li>listStatements() - list all active Sqlite statements</li>
 <li>NNSocket() - create a new nanomsg socket object</li>
 </ul>
+<h1 id="cache-configurations">Cache configurations</h1>
+<p>Database layer support caching of the responses using <code>db.getCached</code> call, it retrieves exactly one record from the configured cache, if no record exists it
+will pull it from the database and on success will store it in the cache before returning to the client. When dealing with cached records, there is a special option
+that must be passed to all put/update/del database methods in order to clear local cache, so next time the record will be retrieved with new changes from the database
+and refresh the cache, that is <code>{ cached: true }</code> can be passed in the options parameter for the db methods that may modify records with cached contents. In any case
+it is required to clear cache manually there is <code>db.clearCached</code> method for that.</p>
+<h2 id="internal-with-nanomsg">Internal with nanomsg</h2>
+<p>For cache management signaling, all servers maintain local cache per machine, it is called <code>LRU</code> cache. This cache is maintained in the master Web process and
+serves all Web worker processes via IPC channel. Every Web master process if compiled with nanomsg library can accept cache messages on a TCP port (<code>cache-port=20194</code>)
+from other backend nodes. Every time any Web worker updates the local cache, its master process re-broadcasts the same request to other connected Web master
+processes on other nodes thus keeping in sync caches on all nodes.</p>
+<p>The basic flow is the following using a hypothetical example:</p>
+<ul>
+<li>there are 4 nodes running in the network: node1, node2, node3 and node4, instead of the names nodeX we can use IP addresses as well.</li>
+<li>all nodes configured with the parameter <code>cache-host=node1,node2</code></li>
+<li>nanomsg sockets may be connected to multiple endpoints, so we can have 2 cache servers for redundency. This config parameter can be specified in the local config file on all nodes
+ or can be defined in the DNS server as TXT record <code>cache-host</code>. If running in AWS the config parameters also can be specified in the user-data the same was as command line arguments.</li>
+<li>any node which is requested for a cached record asks its local cache for such key and if it not found, retrieves it from the database and puts into local cache,
+ if running for a while, potentially every node now may contain same items in the cache and all requests for such items will be served without touching the db</li>
+<li>An update request comes to the node3 which deletes a key from the local cache:<ul>
+<li>node3 also sends &#39;del&#39; request for the requested key to both node1 and node2 servers via connected sockets because of <code>cache-host</code> config parameter</li>
+<li>node1 and node2 servers receive &#39;del&#39; request and delete the key from their local caches</li>
+<li>node1 and node2 re-send same request to all connected clients which are actually all nodes in the network, so all nodes receive &#39;del&#39; cache request</li>
+<li>because we have 2 LRU servers, every node will receive the same del request twice which is very small packet and removing same item from the cache
+costs nothing, both requests will be receive winin milliseonds from each other.</li>
+<li>next request to any of the nodes for the key just deleted will result in retrieving the record from the database and putting back to the local cache
+of the node until the next &#39;del&#39; request.</li>
+<li>Important: each node maintains its own version of the cache, i.e. all nodes do not have exactly the same
+items in the cache, over time they all retieve same records but only on demand and when one node puts an item in the cache it is not sent to all other nodes.
+To make the cache synhronized set <code>cache-sync=1</code>, in this case all cache commands will be sent to all nodes, with multiple broadcast nodes
+the same item will be sent multiple times from each broadcast node, this is why it is disabled by default, sending &#39;del&#39; multiple times does not add
+much overhead as opposed to re-sending actual items.</li>
+</ul>
+</li>
+</ul>
+<p>For very frequent items there is no point using local cache but for items reasonable static with not so often changes this cache model will work reliably and similar to
+what <code>memcached</code> or <code>Redis</code> server would do as well.</p>
+<p>The benefits of this approach is not to run any separate servers and dealing with its own configuration and support, using nanomsg
+internal backend cache system is self contained and does not need additional external resources, any node can be LRU server whose only role is to make sure all other
+nodes flush their caches if needed. Using redundant broadcast servers makes sure such flush requests reach all nodes in the cluster and there is no single point of failure.</p>
+<p>Essentually, setting <code>cache-host</code> to the list of any nodes in the network is what needs to be done to support distributed cache with nanomsg sockets.</p>
+<h1 id="memcached">memcached</h1>
+<p>Setting <code>cache-type=memcache</code> and pointing <code>memcache-host</code> to one or more hosts running memcached servers is what needs to be done only, the rest of the
+system works similar to the internal nanomsg caching but using memcache client instead. The great benefit using memcache is to configure more than one
+server in <code>memcache-host</code> separated by comma which makes it more reliable and eliminates single point of failure if one of the memcache servers goes down.</p>
+<h1 id="redis">Redis</h1>
+<p>Set <code>cache-type=redis</code> and point <code>redis-host</code> to the server running Redis server. Only single redis server can be specified.</p>
 <h1 id="pub-sub-configurations">PUB/SUB configurations</h1>
 <p>Publish/subscribe functionality allows clients to receive notifications without constantly polling for new events. A client can be anything but
-the backend provides some partially implemented subscription notifications for Web clients using the Long Poll. The Account API call <code>/account/subscribe</code>
-can use any pub/sub mode.</p>
+the backend provides some partially implemented subscription notifications for Web clients using the Long Poll.
+The Account API call <code>/account/subscribe</code> can use any pub/sub mode.</p>
+<p>The flow of the pub/sub operations is the following:</p>
+<ul>
+<li>a client makes <code>/account/subscribe</code> API request, the connection is made and is kept open indefenitely or as long as configured using <code>api-subscribe-timeput</code>.</li>
+<li>the backend receives this request, and runs the <code>core.ipcSubscribe</code> method with the key being the account id<ul>
+<li>if nanomsg pub/sub hosts are configured, the method connect to the sub hosts with the subscription key and wait for the events to be published</li>
+</ul>
+</li>
+<li>some other client makes an API call that triggers an event, like update a counter, sends a message, on such event the backend
+always runs <code>core.ipcPublish</code> method and if there is no publish host configured nothing happens.
+If there is a host to publish, it sends the message to it, the message being a JSON object with the request API path and mtime, other properties depend on the call made.</li>
+<li>this step depends on the pub/sub system being used:<ul>
+<li>nanomsg, the publish server receives nanomsg request and re-broadcasts it to all subscription servers connected, there can be more than one pub/sub host configured for
+redundancy purposes and to eliminate single point of failure. All subscription servers will receive the published message and send it to the connected HTTP clients
+with matched subscribed key.</li>
+<li>redis, uses native Redis pub/sub system, every client directly connected to the redis server and subscribed to the events</li>
+</ul>
+</li>
+<li>the client who issued <code>/account/subscribe</code> command may receive the same event more than once, this is expected behaiviour,
+it is responsibility of the client to handle duplicates at this moment, this may change in the future.</li>
+</ul>
 <h2 id="internal-with-nanomsg">Internal with nanomsg</h2>
+<p>To use publish/subcribe with nanomsg, first nanomsg must be compiled in the backend module. Usually this is done when explicitely installed with <code>--backend_deps_force</code>
+options to the npm install, see above how to install the package.</p>
+<p>All nodes must have the same configuration, similar to the LRU cache otherwise some unexpected behaviour may happen.
+The config parameter <code>msg-host</code> defines where to publish messages and from where messages can be retrieved. Having more than one hosts listed will ensure
+better reliability of delivering messages but may result in message duplication in some cases when some servers are much slower than others for any reason.</p>
 <h2 id="redis">Redis</h2>
+<p>To configure the backend to use Redis for local cache set <code>msg-type=redis</code> and <code>redis-host=HOST</code> where HOST is IP address or hostname of the redis server.
+After that all cache requests will be directed to that redis server. The work flow itself is similar to nanomsg internal system, just instead of nanomsg sockets redis
+client is used.</p>
 <h1 id="security-configurations">Security configurations</h1>
 <h2 id="api-only">API only</h2>
 <p>This is default setup of the backend when all API requests except <code>/account/add</code> must provide valid signature and all HTML, Javascript, CSS and image files
@@ -962,12 +1123,12 @@ rendering is done using Javascript. This is how the <code>api.html</code> develp
 <p>To see current default config parameters run any of the following commands:</p>
 <pre><code>    rc.backend run-backend -help | grep api-allow
 
-    node -e &#39;require(&quot;backend&quot;).core.showHelp()&#39;
+    node -e &#39;require(&quot;backendjs&quot;).core.showHelp()&#39;
 </code></pre><p>To disable open registration in this mode just add config parameter <code>api-disallow-path=^/account/add$</code> or if developing an application add this in the initMiddleware</p>
 <pre><code>    api.initMiddleware = function(callback) {
         this.allow.splice(this.allow.indexOf(&#39;^/account/add$&#39;), 1);
     }
-</code></pre><h2 id="secure-web-site-client-verificastion">Secure Web site, client verificastion</h2>
+</code></pre><h2 id="secure-web-site-client-verification">Secure Web site, client verification</h2>
 <p>This is a mode when the whole Web site is secure by default, even access to the HTML files must be authenticated. In this mode the pages must defined &#39;Backend.session = true&#39;
 during the initialization on every html page, it will enable Web sessions for the site and then no need to sign every API reauest.</p>
 <p>The typical client Javascript verification for the html page may look like this, it will redirect to login page if needed,
@@ -1023,37 +1184,44 @@ On startup the rc.backend tries to load and source the following config files:</
 customize the running environment, these should be regular shell scripts using bash syntax.</p>
 <p>Most common used commands are:</p>
 <ul>
-<li>rc.backend run-backend - run the backend or the app for development purposes</li>
+<li>rc.backend run-backend - run the backend or the app for development purposes, uses local app.js if exists otherwise runs generic server</li>
 <li>rc.backend run-shell - start REPL shell with the backend module loaded and available for use, all submodules are availablein the shell as well like core, db, api</li>
 <li>rc.backend init-app - create the app skeleton</li>
-<li>rc.backend run-app - run the local app in dev mode</li>
-<li>rc.backend put-app path [-host host] - sync sources of the app with the remote site, uses BACKEND_MASTER env variable for host if not specified in the command line</li>
+<li>rc.backend put-backend path [-host host] - sync sources of the app with the remote site, uses BACKEND_MASTER env variable for host if not specified in the command line, this is for developent version of the backend only</li>
 <li>rc.backend setup-server [-root path] - initialize Amazon instance for backend use, optional -root can be specified where the backend home will be instead of ~/.backend</li>
 </ul>
-<p>Here is the typical example how to setup new AWS server:</p>
+<h1 id="deployment-use-cases">Deployment use cases</h1>
+<h2 id="aws-instance-setup">AWS instance setup</h2>
+<p>Here is the typical example how to setup new AWS server, it is not required and completely optional but rc.backend provies some helpful commands that may simplify
+new image configuration.</p>
 <ul>
-<li>start new AWS instance via AWS console, use Amazon Linuxc or CentOS 6</li>
+<li>start new AWS instance via AWS console, use Amazon Linux or CentOS 6</li>
 <li>copy rc.backend to the <code>ec2-user</code> home directory of the new instance</li>
 <li>login as <code>ec2-user</code></li>
-<li>run <code>sudo ./rc.backend setup-server</code></li>
-<li>now the instance is ready to run the backend, global system-wide options can be defined in the <code>/etc/backendrc</code> like BACKEND_ARGS, BACKEND_NAME, BACKEND_ROOT env variables,
-if not set the defaults will be used.</li>
-<li>reboot</li>
-<li>login as <code>backend</code> user now using the AWS keypair private key</li>
+<li>run <code>sudo ./rc.backend setup-server</code><ul>
+<li>optionally you can specify the root of the backend instead of default /home/backend/.backend to some other directory</li>
+<li>for example this command: <code>sudo ./rc.backend setup-server -root /home/backend</code> will make all backend files in the home of the backend user which is very convenient and easy to support</li>
 </ul>
-<h1 id="deployment-use-cases">Deployment use cases</h1>
-<p>The first thing when deploying the backnd into production is to change API port, by default is is 800, but we would want port 80 so regardless
-how the environment is setup it is ultimatley 2 way to specify the port for HTTP server to use:</p>
+</li>
+<li>global system-wide options are defined in the <code>/etc/backendrc</code> like BACKEND_ARGS, BACKEND_NAME, BACKEND_ROOT env variables</li>
+<li>reboot</li>
+<li>login as <code>backend</code> user using the AWS keypair private key</li>
+<li>run <code>ps agx</code>, it should show several backend processes running</li>
+<li>try to access the instance via HTTP port for the API console or documentation</li>
+</ul>
+<h2 id="configure-http-port">Configure HTTP port</h2>
+<p>The first thing when deploying the backend into production is to change API HTTP port, by default is is 8000, but we would want port 80 so regardless
+how the environment is setup it is ultimatley 2 ways to specify the port for HTTP server to use:</p>
 <ul>
 <li><p>config file</p>
 <p>The config file is always located in the etc/ folder in the backend home directory, how the home is specified depends on the system but basically it can be
 defined via command line arguments as <code>-home</code> or via environment variables when using rc.backend. See rc.backend documentation but on AWS instances created with rc.backend
-<code>setup-server</code> command, for non-standard home use <code>/etc/backendrc</code> profile, specify <code>BACKEND_HOME=/home/backend</code> there and the rest will be takedn care of</p>
+<code>setup-server</code> command, for non-standard home use <code>/etc/backendrc</code> profile, specify <code>BACKEND_HOME=/home/backend</code> there and the rest will be taken care of</p>
 </li>
 <li><p>command line arguments</p>
 <p>When running node scripts which use the backend, just specify <code>-home</code> command line argument with the directory where yor backend should be and the backend will use it</p>
 <p>Example:</p>
-<pre><code>  node test_backend.js -home $HOME
+<pre><code>  node test_backend.js -home $HOME -port 80
 </code></pre></li>
 </ul>
 <h1 id="security">Security</h1>
@@ -1106,7 +1274,7 @@ this is the only way to ensure the body is not modified when not using query par
 <p>See web/js/backend.js for function Backend.sign or function core.signRequest in the core.js for the Javascript implementation.</p>
 <h1 id="backend-framework-development-mac-os-x-developers-">Backend framework development (Mac OS X, developers)</h1>
 <ul>
-<li><code>git clone https://github.com/vseryakov/backend.git</code> or <code>git clone git@github.com:vseryakov/backend.git</code></li>
+<li><code>git clone https://github.com/vseryakov/backendjs.git</code> or <code>git clone git@github.com:vseryakov/backendjs.git</code></li>
 <li>cd backend</li>
 <li><p>to initialize environment for the backend development it needs to set permissions for $BACKEND_PREFIX (default is /opt/local)
 to the current user, this is required to support global NPM modules.</p>
@@ -1136,11 +1304,16 @@ backend via npm with all dependencies, make sure this runs in the core backend d
 </code></pre></li>
 <li><p>to compile the binary module and all required dependencies just type <code>make</code></p>
 <ul>
-<li><p>for ImageMagick to work propely it needs some dependencies to be installed:</p>
-<p>  port install libpng jpeg librsvg tiff jasper lcms2</p>
+<li><p>for DB drivers and ImageMagick to work propely it needs some dependencies to be installed:</p>
+<p>  port install libpng jpeg tiff lcms2 mysql56 postgresql93</p>
+</li>
+<li><p>make sure there is no openjpeg15 installed, it will conflict with ImageMagick jp2 codec</p>
 </li>
 <li><p>to see the actual compiler setting during compile the following helps:</p>
 <pre><code>  make V=1
+</code></pre></li>
+<li><p>to compile with internal nanomsg and ImageMagick use:</p>
+<pre><code>  make force V=1
 </code></pre></li>
 </ul>
 </li>
@@ -1158,31 +1331,31 @@ backend via npm with all dependencies, make sure this runs in the core backend d
 </ul>
 <h1 id="author">Author</h1>
 <p>  Vlad Seryakov</p>
-<p>Check out the <a href="http://vseryakov.github.io/backend/">Documentation</a> for more documentation.</p>
+<p>Check out the <a href="http://vseryakov.github.io/backendjs/">Documentation</a> for more documentation.</p>
 <h2 id="configuration-parameters">Configuration parameters</h2>
 <ul>
 <li><code>help</code> - Print help and exit</li>
 <li><code>debug</code> - Enable debugging messages, short of -log debug</li>
 <li><code>log</code> - Set debugging level: none, log, debug, dev</li>
-<li><code>log-file</code> - File where to write logging messages, if not specified logs display to the console</li>
+<li><code>log-file</code> - Log to a file, if not specified used default logfile, disables syslog. Default: log/backend.log</li>
 <li><code>syslog</code> - Write all logging messages to syslog, connect to the local syslog server over Unix domain socket</li>
 <li><code>console</code> - All logging goes to the console resetting all previous log related settings, this is used in the development mode mostly</li>
-<li><code>home</code> - Specify home directory for the server, the server willtry to chdir there or exit if it is not possible, the directory must exist Default: /Users/vlad/.backend</li>
-<li><code>concurrency</code> - How many simultaneous tasks to run at the same time inside one process, this is used by async module only to perform several tasks at once, this is not multithreading but and only makes sense for I/O related tasks Default: 2</li>
+<li><code>home</code> - Specify home directory for the server, the server will try to chdir there or exit if it is not possible, the directory must exist. Default: /Users/vlad/.backend</li>
+<li><code>concurrency</code> - How many simultaneous tasks to run at the same time inside one process, this is used by async module only to perform several tasks at once, this is not multithreading but and only makes sense for I/O related tasks. Default: 2</li>
 <li><code>config-file</code> - Path to the config file instead of the default etc/config, can be absolute or relative path</li>
-<li><code>err-file</code> - Path to the error log file where daemon will put app errors and crash stacks</li>
+<li><code>err-file</code> - Path to the error log file where daemon will put app errors and crash stacks. Default: log/error.log</li>
 <li><code>etc-dir</code> - Path where to keep config files</li>
 <li><code>web-dir</code> - Path where to keep web pages</li>
 <li><code>tmp-dir</code> - Path where to keep temp files</li>
 <li><code>spool-dir</code> - Path where to keep modifiable files</li>
-<li><code>log-dir</code> - Path where to keep log files</li>
+<li><code>log-dir</code> - Path where to keep other log files, log-file and err-file are not affected by this</li>
 <li><code>files-dir</code> - Path where to keep uploaded files</li>
 <li><code>images-dir</code> - Path where to keep images</li>
-<li><code>uid</code> - User id to switch after startup if running as root, used by Web servers and job workers Default: 777</li>
+<li><code>uid</code> - User id to switch after startup if running as root, used by Web servers and job workers. Default: 777</li>
 <li><code>gid</code> - Group id to switch after startup if running to root</li>
-<li><code>umask</code> - Permissions mask for new files, calls system umask on startup, if not specified the current umask is used Default: 0002</li>
-<li><code>port</code> - port to listen for the HTTP server, this is global default Default: 8000</li>
-<li><code>bind</code> - Bind to this address only, if not specified listen on all interfaces Default: 0.0.0.0</li>
+<li><code>umask</code> - Permissions mask for new files, calls system umask on startup, if not specified the current umask is used. Default: 0002</li>
+<li><code>port</code> - port to listen for the HTTP server, this is global default. Default: 8000</li>
+<li><code>bind</code> - Bind to this address only, if not specified listen on all interfaces. Default: 0.0.0.0</li>
 <li><code>ssl-port</code> - port to listen for HTTPS server, this is global default</li>
 <li><code>ssl-bind</code> - Bind to this address only for HTTPS server, if not specified listen on all interfaces</li>
 <li><code>ssl-key</code> - Path to SSL prvate key</li>
@@ -1193,52 +1366,56 @@ backend via npm with all dependencies, make sure this runs in the core backend d
 <li><code>ssl-crl</code> - Either a string or list of strings of PEM encoded CRLs (Certificate Revocation List)</li>
 <li><code>ssl-ciphers</code> - A string describing the ciphers to use or exclude. Consult <a href="http://www.openssl.org/docs/apps/ciphers.html#CIPHER_LIST_FORMAT">http://www.openssl.org/docs/apps/ciphers.html#CIPHER_LIST_FORMAT</a> for details on the format</li>
 <li><code>ssl-request-cert</code> - If true the server will request a certificate from clients that connect and attempt to verify that certificate. </li>
-<li><code>timeout</code> - HTTP request idle timeout for servers in ms, how long to keep the connection socket open, this does not affect Long Poll requests Default: 30000</li>
+<li><code>timeout</code> - HTTP request idle timeout for servers in ms, how long to keep the connection socket open, this does not affect Long Poll requests. Default: 30000</li>
 <li><code>daemon</code> - Daemonize the process, go to the background, can be specified only in the command line</li>
 <li><code>shell</code> - Run command line shell, load the backend into the memory and prompt for the commands, can be specified only in the command line, no servers will be initialized, only the core and db modules</li>
 <li><code>monitor</code> - For production use, monitor the master and Web server processes and restarts if crashed or exited, can be specified only in the command line</li>
 <li><code>master</code> - Start the master server, can be specified only in the command line, this process handles job schedules and starts Web server, keeps track of failed processes and restarts them</li>
 <li><code>proxy</code> - Start the HTTP proxy server, uses etc/proxy config file, can be specified only in the command line</li>
-<li><code>proxy-port</code> - Proxy server port Default: 8000</li>
-<li><code>proxy-bind</code> - Proxy server listen address Default: 0.0.0.0</li>
+<li><code>proxy-port</code> - Proxy server port. Default: 8000</li>
+<li><code>proxy-bind</code> - Proxy server listen address. Default: 0.0.0.0</li>
+<li><code>local-db-pool</code> - Local database pool for properties, cookies and other instance specific stuff. Default: sqlite</li>
 <li><code>web</code> - Start Web server processes, spawn workers that listen on the same port, without this flag no Web servers will be started by default</li>
-<li><code>repl-port-web</code> - Web server REPL port, if specified initializes REPL in the Web server process</li>
-<li><code>repl-bind-web</code> - Web server REPL listen address Default: 0.0.0.0</li>
-<li><code>repl-port</code> - Port for REPL interface in the master, if specified triggers REPL server initialization</li>
-<li><code>repl-bind</code> - Listen only on specified address for REPL server in the master process Default: 0.0.0.0</li>
-<li><code>repl-file</code> - User specified file for REPL history Default: .history</li>
-<li><code>lru-max</code> - Max number of items in the LRU cache, this cache is managed by the master Web server process and available to all Web processes maintaining only one copy per machine, Web proceses communicate with LRU cache via IPC mechanism between node processes Default: 50000</li>
-<li><code>lru-server</code> - LRU server that acts as a NN-BUS node to brosadcast cache messages to all connected backends</li>
-<li><code>lru-host</code> - Address of NN-BUS servers for cache broadcasts: ipc:///path,tcp://IP:port...</li>
-<li><code>pub-type</code> - One of the redis, amqp or nn to use for PUB/SUB messaging, default is nanomsg sockets</li>
-<li><code>pub-server</code> - Server to listen for published messages using nanomsg: ipc:///path,tcp://IP:port...</li>
-<li><code>pub-host</code> - Server where clients publish messages to using nanomsg: ipc:///path,tcp://IP:port...</li>
-<li><code>sub-server</code> - Server to listen for subscribed clients using nanomsg: ipc:///path,tcp://IP:port...</li>
-<li><code>sub-host</code> - Server where clients received messages from using nanomsg: ipc:///path,tcp://IP:port...</li>
-<li><code>memcache-host</code> - List of memcached servers for cache messages: IP:port,IP:port...</li>
+<li><code>repl-port-web</code> - Web server REPL port, if specified it initializes REPL in the Web server process</li>
+<li><code>repl-bind-web</code> - Web server REPL listen address. Default: 0.0.0.0</li>
+<li><code>repl-port</code> - Port for REPL interface in the master, if specified it initializes REPL in the master server process</li>
+<li><code>repl-bind</code> - Listen only on specified address for REPL server in the master process. Default: 0.0.0.0</li>
+<li><code>repl-file</code> - User specified file for REPL history. Default: .history</li>
+<li><code>lru-max</code> - Max number of items in the LRU cache, this cache is managed by the master Web server process and available to all Web processes maintaining only one copy per machine, Web proceses communicate with LRU cache via IPC mechanism between node processes. Default: 50000</li>
+<li><code>no-msg</code> - Disable nanomsg messaging sockets</li>
+<li><code>msg-port</code> - Ports to use for nanomsg sockets for message publish and subscribe, 2 ports will be used, this one and the next. Default: 20195</li>
+<li><code>msg-type</code> - One of the redis or nanomsg to use for PUB/SUB messaging, default is nanomsg sockets</li>
+<li><code>msg-host</code> - Server(s) where clients publish and subscribe messages using nanomsg sockets, IPs or hosts separated by comma, TCP port is optional, msg-port is used. DNS TXT configurable.</li>
+<li><code>memcache-host</code> - List of memcached servers for cache messages: IP[:port],host[:port]... DNS TXT configurable.</li>
 <li><code>memcache-options</code> - JSON object with options to the Memcached client, see npm doc memcached</li>
-<li><code>redis-host</code> - Address to Redis server for cache messages</li>
+<li><code>redis-host</code> - Address to Redis server for cache messages. DNS TXT configurable.</li>
 <li><code>redis-options</code> - JSON object with options to the Redis client, see npm doc redis</li>
 <li><code>amqp-options</code> - JSON object with options to the AMQP client, see npm doc amqp</li>
 <li><code>cache-type</code> - One of the redis or memcache to use for caching in API requests</li>
-<li><code>no-cache</code> - Do not use LRU server, all gets will result in miss and puts will have no effect</li>
+<li><code>cache-host</code> - Address of nanomsg cache servers, IPs or hosts separated by comma: IP:[port],host[:[port], if TCP port is not specified, cache-port is used. DNS TXT configurable.</li>
+<li><code>cache-port</code> - Port to use for nanomsg sockets for cache requests. Default: 20194</li>
+<li><code>no-cache</code> - Disable caching, all gets will result in miss and puts will have no effect</li>
+<li><code>cache-sync</code> - Maintain all caches in sync when using nanomsg, put/incr commands will be broadcasted, otherwise only del commands</li>
+<li><code>no-remote-config</code> - Disable any attempts to read config from supported remote destinations like DNS...</li>
 <li><code>worker</code> - Set this process as a worker even it is actually a master, this skips some initializations</li>
-<li><code>logwatcher-email</code> - Email address for the logwatcher notifications, the monitor process scans system and backend log files for errors and sends them to this email address, if not specified no log watching will happen</li>
+<li><code>logwatcher-email</code> - Email address for the logwatcher notifications, the monitor process scans system and backend log files for errors and sends them to this email address, if not specified no log watching will happen. DNS TXT configurable.</li>
 <li><code>logwatcher-from</code> - Email address to send logwatcher notifications from, for cases with strict mail servers accepting only from known addresses</li>
-<li><code>logwatcher-ignore</code> - Regexp with patterns that needs to be ignored by logwatcher process Default: NOTICE: |DEBUG: |DEV: </li>
-<li><code>logwatcher-match</code> - Regexp patterns that match conditions for logwatcher notifications, this is in addition to default backend logger patterns</li>
-<li><code>logwatcher-interval</code> - How often to check for errors in the log files Default: 3600</li>
-<li><code>user-agent</code> - Add HTTP user-agent header to be used in HTTP requests, for scrapers or other HTTP requests that need to be pretended coming from Web browsers Default: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:18.0) Gecko/20100101 Firefox/18.0,Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:21.0) Gecko/20100101 Firefox/21.0,Mozilla/5.0 (Macintosh; Intel Mac OS X 10.7; rv:20.0) Gecko/20100101 Firefox/20.0,Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/536.29.13 (KHTML, like Gecko) Version/6.0.4 Safari/536.29.13,Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.65 Safari/537.31,Mozilla/5.0 (X11; Linux i686) AppleWebKit/534.34 (KHTML, like Gecko) Safari/534.34,Opera/9.80 (Macintosh; Intel Mac OS X 10.7.5) Presto/2.12.388 Version/12.15,Mozilla/5.0 (Windows NT 6.1; WOW64; rv:21.0) Gecko/20100101 Firefox/21.0,Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.1; WOW64; Trident/6.0; SLCC2; .NET CLR 2.0.50727,Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.1; WOW64; Trident/6.0; SLCC2; .NET CLR 3.5.30729; .NET CLR 3.0.30729; Media Center PC 6.0; .NET4.0C; InfoPath.2; BRI/2</li>
+<li><code>logwatcher-ignore</code> - Regexp with patterns that needs to be ignored by logwatcher process, it is added to the list of ignored patterns. Default: NOTICE: ,DEBUG: ,DEV: </li>
+<li><code>logwatcher-match</code> - Regexp patterns that match conditions for logwatcher notifications, this is in addition to default backend logger patterns. Default: [[0-9]+]: (ERROR|WARNING): ,message&quot;:&quot;ERROR:,queryAWS:.+Errors:</li>
+<li><code>logwatcher-interval</code> - How often to check for errors in the log files. Default: 3600</li>
+<li><code>logwatcher-file</code> - Add a file to be watched by the logwatcher, it will use all configured match patterns</li>
+<li><code>user-agent</code> - Add HTTP user-agent header to be used in HTTP requests, for scrapers or other HTTP requests that need to be pretended coming from Web browsers. Default: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:18.0) Gecko/20100101 Firefox/18.0,Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:21.0) Gecko/20100101 Firefox/21.0,Mozilla/5.0 (Macintosh; Intel Mac OS X 10.7; rv:20.0) Gecko/20100101 Firefox/20.0,Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/536.29.13 (KHTML, like Gecko) Version/6.0.4 Safari/536.29.13,Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.65 Safari/537.31,Mozilla/5.0 (X11; Linux i686) AppleWebKit/534.34 (KHTML, like Gecko) Safari/534.34,Opera/9.80 (Macintosh; Intel Mac OS X 10.7.5) Presto/2.12.388 Version/12.15,Mozilla/5.0 (Windows NT 6.1; WOW64; rv:21.0) Gecko/20100101 Firefox/21.0,Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.1; WOW64; Trident/6.0; SLCC2; .NET CLR 2.0.50727,Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.1; WOW64; Trident/6.0; SLCC2; .NET CLR 3.5.30729; .NET CLR 3.0.30729; Media Center PC 6.0; .NET4.0C; InfoPath.2; BRI/2</li>
 <li><code>backend-host</code> - Host of the master backend, can be used for backend nodes communications using core.sendRequest function calls with relative URLs, also used in tests.</li>
 <li><code>backend-login</code> - Credentials login for the master backend access</li>
 <li><code>backend-secret</code> - Credentials secret for the master backend access</li>
 <li><code>domain</code> - Domain to use for communications, default is current domain of the host machine</li>
-<li><code>max-distance</code> - Max searchable distance(radius) in km, for location searches to limit the upper bound Default: 50</li>
-<li><code>min-distance</code> - Radius for the smallest bounding box in km containing single location, radius searches will combine neighboring boxes of this size to cover the whole area with the given distance request, also this affects the length of geohash keys stored in the bk_location table Default: 5</li>
+<li><code>config-domain</code> - Domain to query for configuration TXT records, default is current domain of the host machine</li>
+<li><code>max-distance</code> - Max searchable distance(radius) in km, for location searches to limit the upper bound. Default: 50</li>
+<li><code>min-distance</code> - Radius for the smallest bounding box in km containing single location, radius searches will combine neighboring boxes of this size to cover the whole area with the given distance request, also this affects the length of geohash keys stored in the bk_location table. Default: 5</li>
 <li><code>instance</code> - Enables instance mode, it means the backend is running in the cloud to execute a job or other task and can be terminated during the idle timeout</li>
 <li><code>backtrace</code> - Enable backtrace facility, trap crashes and report the backtrace stack</li>
 <li><code>watch</code> - Watch sources directory for file changes to restart the server, for development, the backend module files will be added to the watch list automatically, so only app specific directores should be added</li>
-<li><code>db-pool</code> - Default pool to be used for db access without explicit pool specified Default: sqlite</li>
+<li><code>db-pool</code> - Default pool to be used for db access without explicit pool specified. Default: sqlite</li>
 <li><code>db-no-pools</code> - Do not use other db pools except default sqlite</li>
 <li><code>db-sqlite-max</code> - Max number of open connection for the pool</li>
 <li><code>db-sqlite-idle</code> - Number of ms for a connection to be idle before being destroyed</li>
@@ -1247,54 +1424,57 @@ backend via npm with all dependencies, make sure this runs in the core backend d
 <li><code>db-pgsql-max</code> - Max number of open connection for the pool</li>
 <li><code>db-pgsql-idle</code> - Number of ms for a connection to be idle before being destroyed</li>
 <li><code>db-pgsql-tables</code> - PostgreSQL tables, list of tables that belong to this pool only</li>
-<li><code>db-mysql-pool</code> - MySQL pool access url in the format: myql://user:pass@host/db</li>
+<li><code>db-mysql-pool</code> - MySQL pool access url in the format: mysql://user:pass@host/db</li>
 <li><code>db-mysql-max</code> - Max number of open connection for the pool</li>
 <li><code>db-mysql-idle</code> - Number of ms for a connection to be idle before being destroyed</li>
 <li><code>db-mysql-tables</code> - PostgreSQL tables, list of tables that belong to this pool only</li>
 <li><code>db-dynamodb-pool</code> - DynamoDB endpoint url</li>
 <li><code>db-dynamodb-tables</code> - DynamoDB tables, list of tables that belong to this pool only</li>
+<li><code>db-mongodb-pool</code> - MongoDB endpoint url</li>
+<li><code>db-mongodb-tables</code> - MongoDB tables, list of tables that belong to this pool only</li>
 <li><code>db-cassandra-pool</code> - Casandra endpoint url</li>
 <li><code>db-cassandra-max</code> - Max number of open connection for the pool</li>
 <li><code>db-cassandra-idle</code> - Number of ms for a connection to be idle before being destroyed</li>
 <li><code>db-cassandra-tables</code> - DynamoDB tables, list of tables that belong to this pool only</li>
 <li><code>aws-key</code> - AWS access key</li>
 <li><code>aws-secret</code> - AWS access secret</li>
-<li><code>aws-region</code> - AWS region Default: us-east-1</li>
+<li><code>aws-region</code> - AWS region. Default: us-east-1</li>
 <li><code>aws-keypair</code> - AWS instance keypair name</li>
 <li><code>aws-image-id</code> - AWS image id to be used for remote jobs</li>
-<li><code>aws-instance-type</code> - AWS instance type Default: t1.micro</li>
+<li><code>aws-instance-type</code> - AWS instance type. Default: t1.micro</li>
 <li><code>aws-dynamodb-host</code> - Custom DynamoDB host for local installations</li>
 <li><code>aws-nometadata</code> - Skip retrieval from instance metadata</li>
 <li><code>api-images-url</code> - URL where images are stored, for cases of central image server(s)</li>
 <li><code>api-images-s3</code> - S3 bucket name where to store images</li>
 <li><code>api-files-s3</code> - S3 bucket name where to store files</li>
-<li><code>api-busy-latency</code> - Max time in ms for a request to wait in the queue, if exceeds this value server returns too busy error Default: 1000</li>
+<li><code>api-busy-latency</code> - Max time in ms for a request to wait in the queue, if exceeds this value server returns too busy error. Default: 1000</li>
 <li><code>api-access-log</code> - File for access logging</li>
 <li><code>api-templating</code> - Templating engne to use, see consolidate.js for supported engines, default is ejs</li>
-<li><code>api-session-age</code> - Session age in milliseconds, for cookie based authentication Default: 1209600000</li>
+<li><code>api-session-age</code> - Session age in milliseconds, for cookie based authentication. Default: 1209600000</li>
 <li><code>api-session-secret</code> - Secret for session cookies, session support enabled only if it is not empty</li>
 <li><code>api-data-endpoint-unsecure</code> - Allow the Data API functions to retrieve and show all columns, not just public, this exposes the database to every authenticated call, use with caution</li>
-<li><code>api-disable</code> - Disable default API by endpoint name: account, message, icon..... Default: </li>
-<li><code>api-disable-session</code> - Disable access to API endpoints for Web sessions, must be signed properly Default: </li>
-<li><code>api-allow</code> - Regexp for URLs that dont need credentials, replace the whole access list Default: ^/$,.html$,.(ico|gif|png|jpg|svg)$,.(ttf|eof|woff)$,.(js|css)$,^/public,^/account/add$</li>
+<li><code>api-disable</code> - Disable default API by endpoint name: account, message, icon...... Default: </li>
+<li><code>api-disable-session</code> - Disable access to API endpoints for Web sessions, must be signed properly. Default: </li>
+<li><code>api-allow-admin</code> - URLs which can be accessed by admin accounts only, can be partial urls or Regexp, thisis a convenient options which registers AuthCheck callback for the given endpoints</li>
+<li><code>api-allow</code> - Regexp for URLs that dont need credentials, replace the whole access list. Default: ^/$,.html$,.(ico|gif|png|jpg|svg)$,.(ttf|eof|woff)$,.(js|css)$,^/public,^/account/add$</li>
 <li><code>api-allow-path</code> - Add to the list of allowed URL paths without authentication</li>
 <li><code>api-disallow-path</code> - Remove from the list of allowed URL paths that dont need authentication, most common case is to to remove ^/account/add$ to disable open registration</li>
 <li><code>api-allow-ssl</code> - Add to the list of allowed URL paths using HTRPs only, plain HTTP requetss to these urls will be refused</li>
-<li><code>api-mime-body</code> - Collect full request body in the req.body property for the given MIME type in addition to json and form posts, this is for custom body processing Default: </li>
+<li><code>api-mime-body</code> - Collect full request body in the req.body property for the given MIME type in addition to json and form posts, this is for custom body processing. Default: </li>
 <li><code>api-deny</code> - Regexp for URLs that will be denied access, replaces the whole access list</li>
 <li><code>api-deny-path</code> - Add to the list of URL paths to be denied without authentication</li>
-<li><code>api-subscribe-timeout</code> - Timeout for Long POLL subscribe listener, how long to wait for events, milliseconds Default: 600000</li>
-<li><code>api-subscribe-interval</code> - Interval between delivering events to subscribed clients, milliseconds Default: 5000</li>
-<li><code>api-upload-limit</code> - Max size for uploads, bytes Default: 10485760</li>
-<li><code>server-max-processes</code> - Max processes to launch for servers Default: 1</li>
-<li><code>server-max-workers</code> - Max number of worker processes to launch for jobs Default: 1</li>
-<li><code>server-idle-time</code> - If set and no jobs are submitted the backend will be shutdown, for instance mode only Default: 120</li>
-<li><code>server-crash-delay</code> - Delay between respawing the crashed process Default: 30000</li>
-<li><code>server-restart-delay</code> - Delay between respawning the server after changes Default: 1000</li>
+<li><code>api-subscribe-timeout</code> - Timeout for Long POLL subscribe listener, how long to wait for events, milliseconds. Default: 600000</li>
+<li><code>api-subscribe-interval</code> - Interval between delivering events to subscribed clients, milliseconds. Default: 5000</li>
+<li><code>api-upload-limit</code> - Max size for uploads, bytes. Default: 10485760</li>
+<li><code>server-max-processes</code> - Max processes to launch for servers. Default: 1</li>
+<li><code>server-max-workers</code> - Max number of worker processes to launch for jobs. Default: 1</li>
+<li><code>server-idle-time</code> - If set and no jobs are submitted the backend will be shutdown, for instance mode only. Default: 120</li>
+<li><code>server-crash-delay</code> - Delay between respawing the crashed process. Default: 30000</li>
+<li><code>server-restart-delay</code> - Delay between respawning the server after changes. Default: 1000</li>
 <li><code>server-job</code> - Job specification, JSON encoded as base64 of the job object</li>
-<li><code>server-jobs-tag</code> - This server executes jobs that match this tag, cannot be empty, default is current hostname Default: Vlad-Macbook</li>
-<li><code>server-max-jobs</code> - How many jobs to execute at any iteration, this relates to the bk_jobs queue only Default: 1</li>
-<li><code>server-jobs-interval</code> - Interval between executing job queue Default: 180000</li>
+<li><code>server-jobs-tag</code> - This server executes jobs that match this tag, cannot be empty, default is current hostname. Default: Vlad-Macbook</li>
+<li><code>server-max-jobs</code> - How many jobs to execute at any iteration, this relates to the bk_jobs queue only. Default: 1</li>
+<li><code>server-jobs-interval</code> - Interval between executing job queue, 0 disables job processing, min interval is 60 secs. Default: 180000</li>
 </ul>
 <h2 id="module-api">Module: API</h2>
 <ul>
@@ -1333,11 +1513,11 @@ the worker processes if they die and restart them automatically. How many proces
                     state: {},
                     zipcode: {},
                     country: {},
-                    latitude: { type: &quot;real&quot; },
-                    longitude: { type: &quot;real&quot; },
-                    geohash: {},
-                    location: {},
-                    ltime: { type: &quot;bigint&quot; },
+                    latitude: { type: &quot;real&quot;, noadd: 1 },
+                    longitude: { type: &quot;real&quot;, noadd: 1 },
+                    geohash: { noadd: 1 },
+                    location: { noadd: 1 },
+                    ltime: { type: &quot;bigint&quot;, noadd: 1 },
                     ctime: { type: &quot;bigint&quot; },
                     mtime: { type: &quot;bigint&quot;, now: 1 } },
 
@@ -1345,6 +1525,10 @@ the worker processes if they die and restart them automatically. How many proces
      bk_icon: { id: { primary: 1, pub: 1 },                 // Account id
                 type: { primary: 1, pub: 1 },               // prefix:type
                 acl_allow: {},                              // Who can see it: all, auth, id:id...
+                descr: {},
+                latitude: { type: &quot;real&quot; },
+                longitude: { type: &quot;real&quot; },
+                geohash: {},
                 mtime: { type: &quot;bigint&quot;, now: 1 }},         // Last time added/updated
 
      // Locations for all accounts to support distance searches
@@ -1360,11 +1544,6 @@ the worker processes if they die and restart them automatically. How many proces
                       state: {},
                       mtime: { type: &quot;bigint&quot;, now: 1 }},
 
-     // Connections by time to query for recent updates since some time...
-     bk_recent: { id: { primary: 1 },               // my account id
-                  mtime: { primary: 1 },            // mtime:connection_id
-                  type: {} },
-
      // References from other accounts, likes,dislikes...
      bk_reference: { id: { primary: 1 },                    // connection_id
                      type: { primary: 1 },                  // type:account_id
@@ -1372,11 +1551,12 @@ the worker processes if they die and restart them automatically. How many proces
                      mtime: { type: &quot;bigint&quot;, now: 1 }},
 
      // Messages between accounts
-     bk_message: { id: { primary: 1 },                    // my account_id
-                   mtime: { primary: 1 },                 // mtime:sender, the current timestamp in milliseconds and the sender
-                   status: {},                            // Status flags: R - read
-                   msg: { type: &quot;text&quot; },                 // Text of the message
-                   icon: {}},                             // Icon base64 or url
+     bk_message: { id: { primary: 1, index: 1, index1: 1 },  // my account_id
+                   mtime: { primary: 1 },                    // mtime:sender, the current timestamp in milliseconds and the sender
+                   status: { index: 1 },                     // status: R:mtime:sender or N:mtime:sender, where R - read, N - new
+                   sender: { index1: 1 },                    // sender:mtime, reverse index by sender
+                   msg: { type: &quot;text&quot; },                    // Text of the message
+                   icon: {}},                                // Icon base64 or url
 
      // All accumulated counters for accounts
      bk_counter: { id: { primary: 1, pub: 1 },                               // account id
@@ -1404,9 +1584,15 @@ the worker processes if they die and restart them automatically. How many proces
 
 <ul>
 <li><p><code>api.init(callback)</code></p>
-<p> Initialize API layer, this mut be called before the api module can be used but it is called by the server module automatically so api.init is
-rearely need to used directly, only for new server implementation or if using in the shell for testing.
-During the init sequence, this function calls api.initMiddleware and api.initApplication methods which by default are empty but can be redefined in the user aplications.</p>
+<p> Initialize API layer, this must be called before the <code>api</code> module can be used but it is called by the server module automatically so <code>api.init</code> is
+rearely need to called directly, only for new server implementation or if using in the shell for testing.</p>
+<p>During the init sequence, this function calls <code>api.initMiddleware</code> and <code>api.initApplication</code> methods which by default are empty but can be redefined in the user aplications.</p>
+<p>The backend.js uses its own request parser that places query parameters into <code>req.query</code> or <code>req.body</code> depending on the method.</p>
+<p>For GET method, <code>req.query</code> contains all url-encoded parameters, for POST method <code>req.body</code> contains url-encoded parameters or parsed JSON payload or multipart payload.</p>
+<p>The simple way of dealing transparently with this is to check for method in the route handler like this:</p>
+<pre><code>if (req.method == &quot;POST&quot;) req.query = req.body;
+</code></pre><p>The reason not to do this by default is that this may not be the alwayse wanted case and distinguishing data coming in the request or in the body may be desirable,
+also, this will needed only for Express handlers <code>.all</code>, when registering handler by method like <code>.get</code> or <code>.post</code> then the handler needs to deal with only either source of the request data.</p>
 </li>
 </ul>
 
@@ -1528,7 +1714,8 @@ Check access permissions, calls the callback with the following argument:</p>
 
 <ul>
 <li><p><code>api.getOptions(req)</code></p>
-<p> Convert query options into database options</p>
+<p> Convert query options into database options, most options are the same as for <code>db.select</code> but prepended with underscore to
+distinguish control parameters from query parameters.</p>
 </li>
 </ul>
 
@@ -1536,6 +1723,14 @@ Check access permissions, calls the callback with the following argument:</p>
 <li><p><code>api.describeTables(tables)</code></p>
 <p> Add columns to account tables, makes sense in case of SQL database for extending supported properties and/or adding indexes
 Used during initialization of the external modules which may add custom columns to the existing tables.</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>api.clearQuery(req, options, table, name)</code></p>
+<p> Clear request query properties specified in the table definition, if any columns for the table contains the property <code>name</code> nonempty, then
+all request properties with the same name as this column name will be removed from the query. This for example is used for the <code>bk_account</code>
+table to disable updating location related columns because speial location API maintains location data and updates the accounts table.</p>
 </li>
 </ul>
 
@@ -1551,14 +1746,14 @@ Used during initialization of the external modules which may add custom columns 
 validating the signature or session cookies.</p>
 <ul>
 <li>method can be &#39;&#39; in such case all mathods will be matched</li>
-<li>path is a string or regexp of the request URL similr to registering Express routes</li>
+<li>path is a string or regexp of the request URL similar to registering Express routes</li>
 <li>callback is a function with the following parameters: function(req, cb) {}, to indicate an error condition pass an object
 with the callback with status: and message: properties, status != 200 means error</li>
 </ul>
 <p>Example:</p>
 <pre><code>    api.registerAccessCheck(&#39;&#39;, &#39;account&#39;, function(req, cb) { cb({status:500,message:&quot;access disabled&quot;}) }))
 
-    api.registerAccessCheck(&#39;POST&#39;, &#39;account/add&#39;, function(req, cb) {
+    api.registerAccessCheck(&#39;POST&#39;, &#39;/account/add&#39;, function(req, cb) {
        if (!req.query.invitecode) return cb({ status: 400, message: &quot;invitation code is required&quot; });
        cb();
     });
@@ -1581,6 +1776,11 @@ an error condition, the callback must pass the same or modified status object in
           if (status.status != 200) status = { status: 302, url: &#39;/error.html&#39; };
           cb(status)
      });
+</code></pre><p>Example with admin access only:</p>
+<pre><code>    api.registerAccessCheck(&#39;POST&#39;, &#39;/data/&#39;, function(req, cb) {
+        if (req.account.type != &quot;admin&quot;) return cb({ status: 401, message: &quot;access denied, admins only&quot; });
+        cb();
+    });
 </code></pre></li>
 </ul>
 
@@ -1628,13 +1828,61 @@ the callback MUST return data back to the client or any other status code</li>
 </ul>
 
 <ul>
-<li><p><code>api.handleIcon(req, res, op, options)</code></p>
+<li><p><code>api.incrCounters(req, options, callback)</code></p>
+<p> Increase a counter, used in /counter/incr API call, options.op can be set to &#39;put&#39;</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>api.getConnections(req, options, callback)</code></p>
+<p> Return all connections for the current account, this function is called by the <code>/connection/get</code> API call.</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>api.putConnections(req, options, callback)</code></p>
+<p> Create a connection between 2 accounts, this function is called by the <code>/connection/add</code> API call.</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>api.delConnections(req, options, callback)</code></p>
+<p> Delete a connection, this function is called by the <code>/connection/del</code> API call</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>api.getLocations(req, options, callback)</code></p>
+<p> Perform locations search, request comes from the Express server, callback will takes err and data to be returned back to the client, this function
+is used in <code>/location/get</code> request. It can be used in the applications with customized input and output if neccesary for the application specific logic.</p>
+<p>Example</p>
+<pre><code>    # Request will look like: /recent/locations?latitude=34.1&amp;longitude=-118.1&amp;mtime=123456789
+    this.app.all(/^\/recent\/locations$/, function(req, res) {
+        var options = self.getOptions(req);
+        options.keys = [&quot;geohash&quot;,&quot;mtime&quot;];
+        options.ops = { mtime: &#39;gt&#39; };
+        options.details = true;
+        self.getLocations(req, options, function(err, data) {
+            self.sendJSON(req, res, data);
+        });
+    });
+</code></pre></li>
+</ul>
+
+<ul>
+<li><p><code>api.putLocations(req, options, callback)</code></p>
+<p> Save locstion coordinates for current account, this function is called by the <code>/location/put</code> API call</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>api.handleIcon(req, res, options)</code></p>
 <p> Process icon request, put or del, update table and deal with the actual image data, always overwrite the icon file</p>
 </li>
 </ul>
 
 <ul>
-<li><p><code>api.formatIcon(req, id, row)</code></p>
+<li><p><code>api.formatIcon(row, account)</code></p>
 <p> Return formatted icon URL for the given account</p>
 </li>
 </ul>
@@ -1642,6 +1890,12 @@ the callback MUST return data back to the client or any other status code</li>
 <ul>
 <li><p><code>api.getIcon(req, res, id, options)</code></p>
 <p> Return icon to the client, checks the bk_icon table for existence and permissions</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>api.sendIcon(req, res, id, options)</code></p>
+<p> Send an icon to the client, only handles files</p>
 </li>
 </ul>
 
@@ -1664,7 +1918,7 @@ the callback MUST return data back to the client or any other status code</li>
 </ul>
 
 <ul>
-<li><p><code>api.delIcon(req, id, options, callback)</code></p>
+<li><p><code>api.delIcon(id, options, callback)</code></p>
 <p> Delete an icon for account, .type defines icon prefix</p>
 </li>
 </ul>
@@ -1702,27 +1956,46 @@ Output file name is built according to the following options properties:</li>
 </ul>
 
 <ul>
-<li><p><code>api.deleteAccount(obj, callback)</code></p>
-<p> Delete account specified in the obj, this must be merged object from bk_auth and bk_account tables.
-Return err if something wrong occured in the callback.</p>
+<li><p><code>api.addMessage(req, options, callback)</code></p>
+<p> Add new message, used in /message/add API call</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>api.delMessages(req, options, callback)</code></p>
+<p> Delete a message or all messages for the given account from the given sender, used in /messge/del` API call</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>api.addAccount(req, options, callback)</code></p>
+<p> Register new account, used in /account/add API call</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>api.updateAccount(req, options, callback)</code></p>
+<p> Update existing account, used in /account/update API call</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>api.deleteAccount(obj, options, callback)</code></p>
+<p> Delete account specified by the obj. Used in <code>/account/del</code> API call.
+The options may contain keep: {} object with table names to be kept without the bk_ prefix, for example
+delete an account but keep all messages and location: keep: { message: 1, location: 1 }</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>api.getStatistics()</code></p>
+<p> Returns an object with collected db and api statstics and metrics</p>
 </li>
 </ul>
 
 <ul>
 <li><p><code>api.collectStatistics()</code></p>
 <p> Metrics about the process</p>
-</li>
-</ul>
-
-<ul>
-<li><p><code>api.collectMetrics(req, res, next)</code></p>
-<p> Metrics collection middleware</p>
-</li>
-</ul>
-
-<ul>
-<li><p><code>api.accessLogger()</code></p>
-<p> Custom access logger middleware</p>
 </li>
 </ul>
 
@@ -1827,9 +2100,12 @@ Example:</p>
 <li>keys can be an array in native DDB JSON format or an object with name:keytype properties, keytype is one of HASH or RANGE</li>
 <li>indexes can be an array in native DDB JSON format or an object with each property for an index name and
 value in the same format as for primary keys, additional property _projection defines projection type for an index.</li>
-<li>options may contain any valid native property if it starts with capital letter.
-Example:<pre><code>  ddbCreateTable(&#39;users&#39;, {id:&#39;S&#39;,mtime:&#39;N&#39;,name:&#39;S&#39;}, {id:&#39;HASH&#39;,name:&#39;RANGE&#39;}, {mtime:{mtime:&quot;HASH&quot;,_projection:&quot;ALL&quot;}}, {ReadCapacityUnits:1,WriteCapacityUnits:1});
+<li>options may contain any valid native property if it starts with capital letter and the following:<ul>
+<li>projection - an object with index name and list of projected properties to be included in the index or string &quot;ALL&quot; for all properties
+Example:<pre><code>ddbCreateTable(&#39;users&#39;, {id:&#39;S&#39;,mtime:&#39;N&#39;,name:&#39;S&#39;}, {id:&#39;HASH&#39;,name:&#39;RANGE&#39;}, {mtime:{mtime:&quot;HASH&quot;}}, {projection:{mtime:[&#39;gender&#39;,&#39;age&#39;]}, ReadCapacityUnits:1,WriteCapacityUnits:1});
 </code></pre></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -1989,7 +2265,7 @@ core.init will parse all command line arguments, the simplest case to run from /
 default environment or pass -home dir so the script will reuse same config and paths as the server
 context can be specified for the callback, if no then it run in the core context</p>
 <ul>
-<li>require(&#39;backend&#39;).run(function() {}) is one example where this call is used as a shortcut for ad-hoc scripting</li>
+<li>require(&#39;backendjs&#39;).run(function() {}) is one example where this call is used as a shortcut for ad-hoc scripting</li>
 </ul>
 </li>
 </ul>
@@ -2025,19 +2301,14 @@ type can be bool, number, list, json</p>
 </ul>
 
 <ul>
-<li><p><code>core.loadConfig(callback)</code></p>
-<p> Parse local config file</p>
+<li><p><code>core.loadConfig(file, callback)</code></p>
+<p> Parse the config file, configFile can point to a file or can be skipped and the default file will be loaded</p>
 </li>
 </ul>
 
 <ul>
-<li><p><code>core.ipcInitServer()</code></p>
-<p> Setup 2-way IPC channel between master and worker.
-Cache management signaling, all servers maintain local cache per process of account, any server in the cluster
-that modifies an account record sends &#39;del&#39; command to clear local caches so the actual record will be re-read from
-the database, all servers share the same database and update it directly. The eviction is done in 2 phases, first local process cache
-is cleared and then it sends a broadcast to all servers in the cluster using nanomsg socket, other servers all subscribed to that
-socket and listen for messages.</p>
+<li><p><code>core.retrieveConfig(callback)</code></p>
+<p> Retrieve config parameters from the network, dns...</p>
 </li>
 </ul>
 
@@ -2353,6 +2624,12 @@ Optional third parameter indicates the number of decimal points to return:</p>
 </ul>
 
 <ul>
+<li><p><code>core.arrayUnique(list, key)</code></p>
+<p> Returns only unique items in the array, optional <code>key</code> specified the name of the column to use when determining uniqueness if items are objects.</p>
+</li>
+</ul>
+
+<ul>
 <li><p><code>core.toBase64(data)</code></p>
 <p> Stringify JSON into base64 string</p>
 </li>
@@ -2361,6 +2638,13 @@ Optional third parameter indicates the number of decimal points to return:</p>
 <ul>
 <li><p><code>core.toJson(data)</code></p>
 <p> Parse base64 JSON into JavaScript object, in some cases this can be just a number then it is passed as it is</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>core.parseLocalAddress(str)</code></p>
+<p> Given a string with list of urls try to find if any points to our local server using IP address or host name, returns the url
+in format: protocol://*:port, mostly to be used with nanomsg sockets</p>
 </li>
 </ul>
 
@@ -2437,14 +2721,14 @@ mdate is a Date object with last modified time</p>
 </ul>
 
 <ul>
-<li><p><code>core.chownSync(file)</code></p>
-<p> Change file owner do not report errors about non existent files</p>
+<li><p><code>core.chownSync()</code></p>
+<p> Change file owner, multiples files can be specified, do not report errors about non existent files</p>
 </li>
 </ul>
 
 <ul>
-<li><p><code>core.mkdirSync(dir)</code></p>
-<p> Create a directory if does not exist</p>
+<li><p><code>core.mkdirSync()</code></p>
+<p> Create a directories if do not exist, multiple dirs can be specified</p>
 </li>
 </ul>
 
@@ -2482,8 +2766,8 @@ Options may be controlled using the properties:</p>
 <ul>
 <li><p><code>core.putIcon(file, id, options, callback)</code></p>
 <p> Put original or just downloaded file in the proper location according to the types for given id,
-this function is used after downloading new image or when moving images from other places
-Rescale all required icons by setting force to true in the options
+this function is used after downloading new image or when moving images from other places. On success
+the callback will be called with the second argument set to the output file name where the image has been saved.
 Valid properties in the options:</p>
 <ul>
 <li>type - icon type, this will be prepended to the name of the icon</li>
@@ -2501,8 +2785,11 @@ Valid properties in the options:</p>
 <li>infile can be a string with file name or a Buffer with actual image data</li>
 <li>options can specify image properties:<ul>
 <li>outfile - if not empty is a file name where to store scaled image or if empty the new image contents will be returned in the callback as a buffer</li>
-<li>width, height - new dimensions if width or height is negative this means do not perform upscale,
-keep the original size if smaller than given positive value, if any is 0 that means keep the original</li>
+<li>width, height - new image dimensions<ul>
+<li>if width or height is negative this means do not perform upscale, keep the original size if smaller than given positive value,</li>
+<li>if any is 0 that means keep the original size</li>
+</ul>
+</li>
 <li>filter - ImageMagick image filters, default is lanczos</li>
 <li>quality - 0-99 percent, image scaling quality</li>
 <li>ext - image format: png, gif, jpg</li>
@@ -2596,8 +2883,11 @@ Example:<pre><code>  core.cloneObj({ 1: 2 }, { 1: 1 }, &quot;3&quot;, 3, &quot;4
 
 <ul>
 <li><p><code>core.mergeObj(obj, options)</code></p>
-<p> Merge obj with the options, all options properties override existing in the obj</p>
-</li>
+<p> Merge an object with the options, all properties in the options override existing in the object, returns a new object</p>
+<p>Example</p>
+<pre><code>var o = core.mergeObject({ a:1, b:2, c:3 }, { c:5, d:1 })
+o = { a:1, b:2, c:5, d:1 }
+</code></pre></li>
 </ul>
 
 <ul>
@@ -2664,12 +2954,17 @@ data type supported by any particular database and vice versa.</p>
 by the API, only single table access. SQL joins can be passed as SQL statements directly to the database using low level db.query
 API call, all high level operations like add/put/del perform SQL generation for single table on the fly.</p>
 <p>Before the DB functions can be used the <code>core.init</code> MUST be called first, the typical usage:</p>
-<pre><code>    var backend = require(&quot;backend&quot;), core = backend.core, db = backend.db;
+<pre><code>    var backend = require(&quot;backendjs&quot;), core = backend.core, db = backend.db;
     core.init(function(err) {
         db.add(...
         ...
     });
-</code></pre></li>
+</code></pre><p>All database methods can use default db pool or any other available db pool by using pool: name in the options. If not specified,
+then default db pool is used, sqlite is default if not -db-pool config parameter specified in the command line or the config file.</p>
+<p>Also, to spread functionality between different databases it is possible to assign some tables to the specific pools using <code>db-pool-tables</code> parameters
+thus redirecting the requests to one or another databases depending on the table, this for example can be useful when using fast but expensive
+database like DynamoDB for real-time requests and slower SQL database running on some slow instance for rare requests, reports or statistics processing.</p>
+</li>
 </ul>
 
 <ul>
@@ -2680,7 +2975,7 @@ API call, all high level operations like add/put/del perform SQL generation for 
       },
 
       bk_cookies: { id: { primary: 1 },
-                    name: { index: 1 },
+                    name: {},
                     domain: {},
                     path: {},
                     value: { type: &quot;text&quot; },
@@ -2706,19 +3001,19 @@ API call, all high level operations like add/put/del perform SQL generation for 
 </ul>
 
 <ul>
-<li><p><code>db.init(callback)</code></p>
+<li><p><code>db.init(options, callback)</code></p>
 <p> Initialize database pools</p>
 </li>
 </ul>
 
 <ul>
-<li><p><code>db.initTables(tables, callback)</code></p>
+<li><p><code>db.initTables(tables, options, callback)</code></p>
 <p> Create tables in all pools</p>
 </li>
 </ul>
 
 <ul>
-<li><p><code>db.initPoolTables(name, tables, callback)</code></p>
+<li><p><code>db.initPoolTables(name, tables, options, callback)</code></p>
 <p> Init the pool, create tables and columns:</p>
 <ul>
 <li>name - db pool to create the tables in</li>
@@ -2728,7 +3023,7 @@ API call, all high level operations like add/put/del perform SQL generation for 
 </ul>
 
 <ul>
-<li><p><code>db.dropPoolTables(name, tables, callback)</code></p>
+<li><p><code>db.dropPoolTables(name, tables, options, callback)</code></p>
 <p> Remove all registered tables from the pool</p>
 </li>
 </ul>
@@ -2744,27 +3039,23 @@ due to some error.</p>
 </ul>
 
 <ul>
-<li><p><code>db.initPool(options, createcb)</code></p>
-<p> Create a database pool</p>
-<ul>
-<li>options - an object defining the pool, the following properties define the pool:<ul>
-<li>pool - pool name/type, of not specified SQLite is used</li>
-<li>max - max number of clients to be allocated in the pool</li>
-<li>idle - after how many milliseconds an idle client will be destroyed</li>
-</ul>
-</li>
-<li>createcb - a callback to be called when actual database client needs to be created, the callback signature is
- function(options, callback) and will be called with first arg an error object and second arg is the database instance, required</li>
-</ul>
-</li>
-</ul>
-
-<ul>
-<li><p><code>db.createPool(name, pool, options)</code></p>
+<li><p><code>db.createPool(options)</code></p>
 <p> Create a new database pool with default methods and properties</p>
 <ul>
-<li>pool - if given it is used as the object prototype, the new database pool will extend this object, otherwise new object is created</li>
-<li>options - an object with default pool properties</li>
+<li>options - an object with default pool properties<ul>
+<li>pool - pool name</li>
+<li>pooling - create generic pool for connection caching</li>
+<li>watchfile - file path to be watched for changes, all clients will be destroyed gracefully
+The following pool callback can be assigned to the pool object:</li>
+</ul>
+</li>
+<li>connect - a callback to be called when actual database client needs to be created, the callback signature is
+function(pool, callback) and will be called with first arg an error object and second arg is the database instance, required for pooling</li>
+<li>bindValue - a callback function(val, info) that returns the value to be used in binding, mostly for SQL drivers, on input value and col info are passed, this callback
+may convert the val into something different depending on the DB driver requirements, like timestamp as string into milliseconds</li>
+<li>convertError - a callback function(table, err, options) that converts native DB driver error into other human readable format</li>
+<li>resolveTable - a callback function(op, table, obj, options) that returns poosible different table at the time of the query, it is called by the <code>db.prepare</code> method
+and if exist it must return the same or new table name for the given query parameters.</li>
 </ul>
 </li>
 </ul>
@@ -2778,7 +3069,13 @@ due to some error.</p>
 <li>values - parameter values for SQL bindings or other driver specific data</li>
 </ul>
 </li>
-<li>options may have the following properties:<ul>
+<li><p>options may have the following properties:</p>
+<ul>
+<li><p>pool - name of the database pool where to execute this query.</p>
+<p>The difference with the high level functions that take a table name as their firt argument, this function must use pool
+explicitely if it is different from the default. Other functions can resolve
+the pool by table name if some tables are assigned to any specific pool by configuration parameters <code>db-pool-tables</code>.</p>
+</li>
 <li>filter - function to filter rows not to be included in the result, return false to skip row, args are: (row, options)</li>
 </ul>
 </li>
@@ -2855,6 +3152,19 @@ if does not exist yet.</em></p>
 </ul>
 
 <ul>
+<li><p><code>db.delAll(table, obj, options, callback)</code></p>
+<p> Delete all records that match given condition, one by one, the input is the same as for <code>db.select</code> and every record
+returned will be deleted using <code>db.del</code> call. The callback will receive on completion the err and all rows found and deleted.
+Special properties that can be in the options for this call:</p>
+<ul>
+<li>process - a function callback that will be called for each row before deleting it, this is for some transformations of the record properties
+in case of complex columns that may contain concatenated values as in the case of using DynamoDB. The callback will be called
+as <code>options.process(row, options)</code></li>
+</ul>
+</li>
+</ul>
+
+<ul>
 <li><p><code>db.replace(table, obj, options, callback)</code></p>
 <p> Add/update the object, check existence by the primary key or by other keys specified.</p>
 <ul>
@@ -2877,9 +3187,16 @@ if it is an array then check only specified columns</li>
 <ul>
 <li>obj - can be an object with primary key properties set for the condition, all matching records will be returned</li>
 <li>obj - can be a list where each item is an object with primary key condition. Only records specified in the list must be returned.</li>
-<li>options can use the following special properties:<ul>
-<li>keys - a list of columns for condition or all primary keys will be used for query condition, only keys will be used in WHERE part of the SQL statement</li>
-<li>ops - operators to use for comparison for properties, an object with column name and operator</li>
+<li><p>options can use the following special properties:</p>
+<ul>
+<li><p>keys - a list of columns for condition or all primary keys will be used for query condition, only keys will be used in WHERE part of the SQL statement.</p>
+<p>By default primary keys are used only but if any other columns specified they will be treated as primary keys, some databases like DynamoDB may restrict which
+columns can be used, for example for DynamoDB keys must contain hash, range keys first and then any other columns can be added which will be filtered by the backend
+after all records are received from the database using has,range combination.</p>
+<p>NOTE: keys can refer only to the columns in the table, any artificial or computed properties can be filtered by using .filter callback</p>
+</li>
+<li>ops - operators to use for comparison for properties, an object with column name and operator. The follwoing operators are available:
+ <code>&gt;, gt, &lt;, lt, =, !=, &lt;&gt;, &gt;=, ge, &lt;=, le, in, between, regexp, iregexp, begins_with, like%, ilike%</code></li>
 <li>opsMap - operator mapping between supplied operators and actual operators supported by the db</li>
 <li>typesMap - type mapping between supplied and actual column types, an object</li>
 <li>select - a list of columns or expressions to return or all columns if not specified</li>
@@ -2894,23 +3211,35 @@ if it is an array then check only specified columns</li>
 </ul>
 <p>On return, the callback can check third argument which is an object with the following properties:</p>
 <ul>
-<li>affected_rows - how many records this operation affected</li>
+<li>affected_rows - how many records this operation affected, for add/put/update</li>
 <li>inserted_oid - last created auto generated id</li>
-<li>next_token - next primary key or offset for pagination by passing it as .start property in the options</li>
+<li>next_token - next primary key or offset for pagination by passing it as .start property in the options, if null it means there are no more pages availabe for this query</li>
 </ul>
-<p>Example: (allow all accounts icons to be visible)</p>
-<pre><code>    db.select(&quot;bk_account&quot;, {}, function(err, rows) {
-        rows.forEach(function(row) {
-            row.acl_allow = &#39;auth&#39;;
-            db.update(&quot;bk_icon&quot;, row);
-        });
+<p>Example: get by primary key, refer above for default table definitions</p>
+<pre><code>    db.select(&quot;bk_message&quot;, { id: &#39;123&#39; }, { count: 2 }, function(err, rows) {
+
     });
 </code></pre></li>
 </ul>
-<p>  Example: (select account with custom filter, not primary key)</p>
-<pre><code>  db.select(&quot;bk_account&quot;, { gender: &#39;f&#39; }, { keys: [&#39;gender&#39;] }, function(err, rows) {
-          ....
-  });
+<p>  Example: get all icons with type greater or equal to 2</p>
+<pre><code>      db.select(&quot;bk_icon&quot;, { id: &#39;123&#39;, type: &#39;2&#39; }, { select: &#39;id,type&#39;, ops: { type: &#39;ge&#39; } }, function(err, rows) {
+
+      });
+</code></pre><p>  Example: get unread msgs sorted by time, recent first</p>
+<pre><code>      db.select(&quot;bk_message&quot;, { id: &#39;123&#39;, status: &#39;N:&#39; }, { sort: &quot;status&quot;, desc: 1, ops: { status: &quot;begins_with&quot; } }, function(err, rows) {
+
+      });
+</code></pre><p>  Example: allow all accounts icons to be visible</p>
+<pre><code>      db.select(&quot;bk_account&quot;, {}, function(err, rows) {
+          rows.forEach(function(row) {
+              row.acl_allow = &#39;auth&#39;;
+              db.update(&quot;bk_icon&quot;, row);
+          });
+      });
+</code></pre><p>  Example: scan accounts with custom filter, not by primary key</p>
+<pre><code>      db.select(&quot;bk_account&quot;, { gender: &#39;f&#39; }, { keys: [&#39;gender&#39;] }, function(err, rows) {
+
+      });
 </code></pre>
 <ul>
 <li><p><code>db.list(table, obj, options, callback)</code></p>
@@ -2923,7 +3252,7 @@ db.list(&quot;bk_account&quot;, &quot;id1,id2&quot;, function(err, rows) { conso
 
 <ul>
 <li><p><code>db.scan(table, obj, options, rowCallback, callback)</code></p>
-<p> Convenient helpr for scanning a table for some processing, rows are retrieved in batches and passed to the callback until there are no more
+<p> Convenient helper for scanning a table for some processing, rows are retrieved in batches and passed to the callback until there are no more
 records matching given criteria. The obj is the same as passed to the <code>db.select</code> method which defined a condition which records to get.
 The rowCallback must be present and is called for every rows batch retrieved and second parameter which is the function to be called
 once the processing is complete. At the end, the callback will be called just with 1 argument, err, this indicates end of scan operation.
@@ -2940,10 +3269,23 @@ Basically, db.scan is the same as db.select but can be used to retrieve large nu
 <pre><code>    db.scan(&quot;bk_account&quot;, {}, { count:10, pool:&quot;dynamodb&quot; }, function(rows, next) {
         async.forEachSeries(rows, function(row, next2) {
             // Copy all accounts from one db into another
-            db.add(&quot;bk_account&quot;, row, { pool: &quot;pgsql&quot; })
+            db.add(&quot;bk_account&quot;, row, { pool: &quot;pgsql&quot; }, next2)
         }, next);
     }, function(err) { });
 </code></pre></li>
+</ul>
+
+<ul>
+<li><p><code>db.migrate(table, options, callback)</code></p>
+<p> Migrate a table via temporary table, copies all records into a temp table, then re-create the table with up-to-date definitions and copies all records back into the new table.
+The following options can be used:</p>
+<ul>
+<li>preprocess - a callback function(row, options, next) that is called for every row on the original table, next must be called to move to the next row, if err is returned as first arg then the processing will stop</li>
+<li>postprocess - a callback function(row, options, next) that is called for every row on the destination table, same rules as for preprocess</li>
+<li>tmppool - the db pool to be used for temporary table</li>
+<li>tpmdrop - if 1 then the temporary table willbe dropped at the end in case of success, by default it is kept</li>
+</ul>
+</li>
 </ul>
 
 <ul>
@@ -2959,22 +3301,26 @@ this works the same way as the <code>select</code> method.</p>
 <p> Geo locations search, paginate all results until the end.
 table must be defined with the following required columns:</p>
 <ul>
-<li>geohash and id as strings, this is the primary key
-split and saved as property id in the record</li>
+<li>geohash - location as primary key hash,</li>
+<li>id or other column name to be used as a RANGE key for DynamoDB or part of the compsoite primary key for SQL, the result will be sorted by this column for all databases</li>
 <li>latitude and longitude as floating numbers</li>
 </ul>
 <p>other optional properties:</p>
 <ul>
 <li>round - a number that defines the &quot;precision&quot; of  the distance, it rounds the distance to the nearest
 round number and uses decimal point of the round number to limit decimals in the distance</li>
+<li>sort - sorting order, by default the RANGE key is used for DynamoDB , it is possinle to specify Local Index as well,
+for SQL the second part of the primary key if exists or id</li>
+<li>unique - specified the column name to be used in determinint unique records, if for some reasons there are multiple record in the location
+table for the same id only one instance will be returned</li>
 </ul>
-<p>On first call, options must contain latitude and longitude of the center and optionally distance for the radius. On subsequent call options.start must contain
+<p>On first call, options must contain latitude and longitude of the center and optionally distance for the radius. On subsequent calls options must be the
 the next_token returned by the previous call</p>
 <p>On return, the callback&#39;s third argument contains the object that must be provided for subsequent searches until rows array is empty.</p>
 <p>Example</p>
 <pre><code>    db.getLocations(&quot;bk_location&quot;, { latitude: -118, longitude: 30, distance: 10 }, function(err, rows, info) {
         ...
-        // Get next page
+        // Get next page using previous info object
         db.getLocations(&quot;bk_location&quot;, info, function(err, rows, info) {
             ...
         });
@@ -2984,15 +3330,20 @@ the next_token returned by the previous call</p>
 
 <ul>
 <li><p><code>db.get(table, obj, options, callback)</code></p>
-<p> Retrieve one record from the database
+<p> Retrieve one record from the database by primary key, returns an array with found record or empty array
 Options can use the following special properties:</p>
 <ul>
-<li>keys - a list of columns for condition or all primary keys</li>
-<li>select - a list of columns or expressions to return or *</li>
-<li>op - operators to use for comparison for properties</li>
+<li>keys - a list of columns to be used instead of primary keys, this can be useful in case of another
+  unique index which is different than the primary key</li>
+<li>select - a list of columns or expressions to return, default is to return all columns</li>
+<li>op - operators to use for comparison for properties, see <code>db.select</code></li>
 <li>cached - if specified it runs getCached version</li>
 </ul>
-</li>
+<p>Example</p>
+<pre><code>    db.get(&quot;bk_account&quot;, { id: &#39;12345&#39; }, function(err, rows) {
+       if (rows.length) console.log(rows);
+    });
+</code></pre></li>
 </ul>
 
 <ul>
@@ -3018,6 +3369,12 @@ Additional options:</p>
 </ul>
 
 <ul>
+<li><p><code>db.getCachedKey(table, obj, options)</code></p>
+<p> Returns concatenated values for the primary keys, this is used for caching records by primary key</p>
+</li>
+</ul>
+
+<ul>
 <li><p><code>db.create(table, columns, options, callback)</code></p>
 <p> Create a table using column definitions represented as a list of objects. Each column definition can
 contain the following properties:</p>
@@ -3035,8 +3392,20 @@ contain the following properties:</p>
 <li>semipub - column is not public but still retrieved to support other public columns, must be deleted after use</li>
 <li>now - means on every add/put/update set this column with current time as Date.now()</li>
 </ul>
-<p>Some properties may be defined multiple times with number suffixes like: unique1, unique2, index1, index2 to create more than one index for the table</p>
-</li>
+<p>Some properties may be defined multiple times with number suffixes like: unique1, unique2, index1, index2 to create more than one index for the table, same
+properties define a composite key in the order of definition.</p>
+<p>Each database pool also can support native options that are passed directly to the driver in the options, these properties are
+defined in the object with the same name as the db driver, for example to define Projection for the DynamoDB index:</p>
+<pre><code>db.create(&quot;test_table&quot;, { id: { primary: 1, type: &quot;int&quot;, dynamodb: { ProvisionedThroughput: { ReadCapacityUnits: 50, WriteCapacityUnits: 50 } } },
+                          type: { primary: 1, pub: 1 },
+                          name: { index: 1, pub: 1, dynamodb: { projection: [&#39;type&#39;] } }
+                        });
+
+db.create(&quot;test_table&quot;, { id: { primary: 1, type: &quot;int&quot;, mongodb: { w: 1, capped: true, max: 100, size: 100 } },
+                          type: { primary: 1, pub: 1 },
+                          name: { index: 1, pub: 1, mongodb: { sparse: true, min: 2, max: 5 } }
+                        });
+</code></pre></li>
 </ul>
 
 <ul>
@@ -3084,7 +3453,7 @@ Returns prepared object to be passed to the driver&#39;s .query method.</p>
 
 <ul>
 <li><p><code>db.getSelectedColumns(table, options)</code></p>
-<p> Return list of selected or allowed only columns, empty list of no condition given</p>
+<p> Return list of selected or allowed only columns, empty list if no options.select is specified</p>
 </li>
 </ul>
 
@@ -3097,6 +3466,22 @@ Returns prepared object to be passed to the driver&#39;s .query method.</p>
 <ul>
 <li><p><code>db.getKeys(table, options)</code></p>
 <p> Return cached primary keys for a table or null</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>db.getSearchKeys(table, options)</code></p>
+<p> Return keys for the table search, if options.keys provided and not empty it will be used otherwise
+table&#39;s primary keys will be returned. This is a wrapper that makes sure that valid keys are used and
+deals with input errors like empty keys list to be consistent between different databases.
+This function always returns an Array even if it is empty.</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>db.getSearchQuery(table, obj, options)</code></p>
+<p> Return query object based on the keys specified in the options or primary keys for the table, only search properties
+will be returned in the query object</p>
 </li>
 </ul>
 
@@ -3173,6 +3558,20 @@ specified table thus providing an opportunity to customize the result.</p>
     delete row.birthday;
 });
 </code></pre></li>
+</ul>
+
+<ul>
+<li><p><code>db.sqlInitPool(options)</code></p>
+<p> Create a database pool for SQL like databases</p>
+<ul>
+<li>options - an object defining the pool, the following properties define the pool:<ul>
+<li>pool - pool name/type, of not specified SQLite is used</li>
+<li>max - max number of clients to be allocated in the pool</li>
+<li>idle - after how many milliseconds an idle client will be destroyed</li>
+</ul>
+</li>
+</ul>
+</li>
 </ul>
 
 <ul>
@@ -3285,6 +3684,7 @@ options may contain the following properties:</p>
 <li>unique - must be combined with index property to specify unique composite index</li>
 <li>len - max length of the column</li>
 <li>notnull - true if should be NOT NULL</li>
+<li>auto - true for AUTO_INCREMENT column</li>
 </ul>
 </li>
 <li>options may contains:<ul>
@@ -3295,6 +3695,8 @@ options may contain the following properties:</p>
 <li>noMultiSQL - return as a list, the driver does not support multiple SQL commands</li>
 <li>noLengths - ignore column length for columns (Cassandra)</li>
 <li>noIfExists - do not support IF EXISTS on table or indexes</li>
+<li>noCompositeIndex - does not support composite indexes (Cassandra)</li>
+<li>noauto - no support for auto increment columns</li>
 </ul>
 </li>
 </ul>
@@ -3349,7 +3751,7 @@ options may define the following properties:</p>
 </ul>
 
 <ul>
-<li><p><code>db.pgsqlOpen(options, callback)</code></p>
+<li><p><code>db.pgsqlConnect(options, callback)</code></p>
 <p> Open PostgreSQL connection, execute initial statements</p>
 </li>
 </ul>
@@ -3361,7 +3763,7 @@ options may define the following properties:</p>
 </ul>
 
 <ul>
-<li><p><code>db.pgsqlBindValue(val, opts)</code></p>
+<li><p><code>db.pgsqlBindValue(val, info)</code></p>
 <p> Convert JS array into db PostgreSQL array format: {..}</p>
 </li>
 </ul>
@@ -3374,7 +3776,7 @@ if new file got copied from the master, we reopen local database</p>
 </ul>
 
 <ul>
-<li><p><code>db.sqliteOpen(options, callback)</code></p>
+<li><p><code>db.sqliteConnect(options, callback)</code></p>
 <p> Common code to open or create local SQLite databases, execute all required initialization statements, calls callback
 with error as first argument and database object as second</p>
 </li>
@@ -3389,6 +3791,12 @@ with error as first argument and database object as second</p>
 <ul>
 <li><p><code>db.dynamodbInitPool(options)</code></p>
 <p> Setup DynamoDB database driver</p>
+</li>
+</ul>
+
+<ul>
+<li><p><code>db.mongodbInitPool(options)</code></p>
+<p> MongoDB pool</p>
 </li>
 </ul>
 
@@ -3636,15 +4044,22 @@ All spaces must be are replaced with %20 to be used in command line parameterrs<
 arguments to the instance backend process, properties must start with -</p>
 <p>Example:</p>
 <pre><code>    { &quot;type&quot;: &quot;server&quot;, &quot;cron&quot;: &quot;0 */10 * * * *&quot;, &quot;job&quot;: &quot;server.processJobs&quot; },
-    { &quot;type&quot;: &quot;local&quot;, &quot;cron&quot;: &quot;0 10 7 * * *&quot;, &quot;job&quot;: &quot;api.processQueue&quot; }
+    { &quot;type&quot;: &quot;local&quot;, &quot;cron&quot;: &quot;0 10 7 * * *&quot;, &quot;id&quot;: &quot;processQueue&quot;, &quot;job&quot;: &quot;api.processQueue&quot; }
     { &quot;type&quot;: &quot;remote&quot;, &quot;cron&quot;: &quot;0 5 * * * *&quot;, &quot;args&quot;: { &quot;-workers&quot;: 2 }, &quot;job&quot;: { &quot;scraper.run&quot;: { &quot;url&quot;: &quot;host1&quot; }, &quot;$scraper.run&quot;: { &quot;url&quot;: &quot;host2&quot; } } }
 </code></pre></li>
 </ul>
 
 <ul>
 <li><p><code>server.runCronjob(id)</code></p>
-<p> Execute a cronjob by id now, it must have been scheduled already</p>
-</li>
+<p> Execute a cronjob by id now, it must have been scheduled already and id property must be specified in the crontab
+When REPL is activated on the master server with -repl-port then connecting to the running master server via telnet it is possible to execute
+cron jobs manually</p>
+<p>Example:</p>
+<pre><code>// Start the backend with repl-port like rc.backend run-backend -repl-port 2080
+
+# telnet localhost 2080
+&gt; server.runCronjob(&quot;processQueue&quot;)
+</code></pre></li>
 </ul>
 
 <ul>
