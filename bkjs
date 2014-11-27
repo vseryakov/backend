@@ -430,8 +430,9 @@ case "$ARG" in
 
   init-packages)
     # Install required runtime packages
+    packages="ntp rsync wget socat mc nano man telnet daemonize"
+
     yum -y -q update
-    yum -y -q install ntp rsync wget socat mc nano man telnet daemonize
 
     # Linux distro specific actions
     case "$OS_TYPE" in
@@ -440,32 +441,34 @@ case "$ARG" in
             echo "Setting up PostgreSQL repo..."
             rpm -i http://yum.postgresql.org/9.3/redhat/rhel-6-x86_64/pgdg-centos93-9.3-1.noarch.rpm
          fi
-         yum -y -q install postgresql93-server
+         packages="$packages postgresql93-server"
          ;;
 
       amazon)
          yum-config-manager --enable epel
-         yum -y -q install postgresql9-server nodejs-devel npm
+         packages="$packages postgresql9-server nodejs-devel npm"
          ;;
     esac
+    sleep 10
+    yum -y -q $packages
     ;;
 
   init-devel)
     # Install development packages for compiling node and modules
-    yum -y -q install git svn gdb gcc-c++ make cmake autoconf automake libtool
-    yum -y -q install libuuid-devel openssl-devel libxml2-devel openldap-devel readline-devel libpng-devel libjpeg-turbo-devel
-    yum -y -q install mysql-devel
+    packages="git svn gdb gcc-c++ make cmake autoconf automake libtool"
+    packages="$packages libuuid-devel openssl-devel libxml2-devel openldap-devel readline-devel libpng-devel libjpeg-turbo-devel mysql-devel"
 
     # Linux distro specific actions
     case "$OS_TYPE" in
       centos)
-         yum -y -q install postgresql93-devel
+         packages="$packages postgresql93-devel"
          ;;
 
       amazon)
-         yum -y -q install postgresql9-devel
+         packages="$packages postgresql9-devel"
          ;;
     esac
+    yum -y -q $packages
     ;;
 
   run-backend|run-server|run-shell|run|backendjs|bksh)
@@ -1130,7 +1133,7 @@ backend.server.start();
     echo "  -log-watch - run logwatcher and exit, send emails in case any errors found"
     echo "  -s3-get -bucket BUCKET -path PATH - retrieve a file from S6"
     echo "  -s3-put -bucket BUCKET -path PATH -fle FILE - store a file to S3"
-    echo "  -db-list -table TABLE [name VALUE ...] - return all records from the table or only that match given column values"
+    echo "  -db-select -table TABLE [name VALUE ...] - return all records from the table or only that match given column values, all supported by db.select options are supported by prefixing with underscore like _count 10, the format is the same as for API query parameters"
     echo "  -db-put -table TABLE name VALUE ... - add or replace a record in the config table, name value pairs are column name and value to be set for the record to be added"
     echo "  -db-del -table TABLE name VALUE ... - delete a record from the table, name value pairs must define a primary key for the table"
     echo ""
