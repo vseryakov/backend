@@ -540,6 +540,7 @@ case "$ARG" in
     fi
     [ "$BKJS_HOST" = "" ] && echo "Remote host required, specify with -host or BKJS_HOST" && exit
     [ -f .gitignore ] && BKJS_RSYNC_ARGS="$BKJS_RSYNC_ARGS --exclude-from .gitignore"
+    [ -f $HOME/.gitignore_global ] && BKJS_RSYNC_ARGS="$BKJS_RSYNC_ARGS --exclude-from $HOME/.gitignore_global"
     [ "$BKJS_USER" != "$(whoami)" ] && BKJS_SSH_ARGS="$BKJS_SSH_ARGS -l $BKJS_USER"
     for h in $BKJS_HOST; do
         echo "Deploying the module to $BKJS_SSH_ARGS $BKJS_RSYNC_ARGS $h:$BKJS_PATH"
@@ -943,7 +944,7 @@ EOF
     fi
 
     [ ! -e $NAME.sh ] && $ECHO "#!/bin/bash\n\nexec node $NAME.js -watch \$(pwd) -web -debug -etc-dir \$(pwd)/etc -web-dir \$(pwd)/web \$@\n" > $NAME.sh && chmod 755 $NAME.sh
-    [ ! -e .gitignore ] && $ECHO "*~\n.*\netc/\nbin/\ndocs/\nbuild/\ndeps/\nvar/\nfiles/\nimages/\ntmp/\nlog/\nnode_modules/\n" >> .gitignore
+    [ ! -e .gitignore ] && $ECHO "*~\n.*\n*.local\nbin/\ndocs/\nbuild/\ndeps/\nvar/\nfiles/\nimages/\ntmp/\nlog/\nnode_modules/\n" >> .gitignore
 
     if [ ! -e etc/config ]; then
        cat > etc/config <<EOF
