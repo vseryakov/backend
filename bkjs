@@ -19,6 +19,7 @@ case "$PLATFORM" in
     # In multi-OS environment have to sync by OS type due to different dependencies in each distro
     [ "$PG_PREFIX" = "" ] && PG_PREFIX=$(find /usr -maxdepth 1 -name 'pgsql*' -type d -print|sort -r|head -1)
     [ -f /etc/sysconfig/$BKJS ] && . /etc/sysconfig/$BKJS
+    [ "$REDIS_CONF" = "" -a -f /etc/redis.conf ] && REDIS_CONF=/etc/redis.conf
     KILLALL="killall -qr"
     ECHO="echo -e"
     SED="sed -i"
@@ -53,13 +54,20 @@ case "$NAME" in
     ;;
 esac
 
-# Return argument value by name, format is -name value
+# Returns an argument value by name, format is -name value
 ARGS=("$@")
 get_arg() {
   for ((i = 0;i < ${#ARGS[@]}; ++i)); do
     [ "$1" = "${ARGS[i]}" ] && echo "${ARGS[i+1]}" && return 0
   done
   echo $2
+}
+
+# Returns 1 if an argument exists
+get_flag() {
+  for ((i = 0;i < ${#ARGS[@]}; ++i)); do
+    [ "$1" = "${ARGS[i]}" ] && echo "1" && return 0
+  done
 }
 
 # Concatenate args
@@ -110,6 +118,7 @@ export BKJS_RSYNC_ARGS=$(concat_arg -rsync $BKJS_RSYNC_ARGS)
 [ "$MONGO_DIR" = "" ] && export MONGO_DIR=$BKJS_HOME/mongo
 [ "$BKJS_IDLETIME" = "" ] && export BKJS_IDLETIME=900
 [ "$BKJS_UPTIME" = "" ] && export BKJS_UPTIME=43200
+[ "$REDIS_CONF" = "" ] && export REDIS_CONF=$PG_PREFIX/etc/redis.conf
 
 # Setup paths
 export PATH=$BKJS_HOME/bin:$BKJS_HOME/node_modules/.bin:$BKJS_PREFIX/bin:$PG_PREFIX/bin:$CASSANDRA_PREFIX/bin:/sbin:/usr/sbin:/usr/local/bin:/opt/local/bin:$PATH
@@ -137,6 +146,11 @@ case "$ARG" in
     $0 stop
     sleep 3
     $0 start
+    ;;
+
+  restart-api)
+    $KILLALL -USR2 "$BKJS: server"
+    exit 0
     ;;
 
   stop)
@@ -487,7 +501,7 @@ case "$ARG" in
 
   init-packages)
     # Install required runtime packages
-    packages="ntp rsync wget socat mc nano man telnet daemonize"
+    packages="ntp rsync wget socat mc nano man telnet daemonize monit redis"
 
     yum -y -q update
 
@@ -499,12 +513,12 @@ case "$ARG" in
             echo "Setting up PostgreSQL repo..."
             rpm -i http://yum.postgresql.org/9.3/redhat/rhel-6-x86_64/pgdg-centos93-9.3-1.noarch.rpm
          fi
-         packages="$packages postgresql93-server redis monit"
+         packages="$packages postgresql93-server"
          ;;
 
       amazon)
          yum-config-manager --enable epel
-         packages="$packages postgresql9-server nodejs-devel npm redis monit"
+         packages="$packages postgresql9-server nodejs-devel npm"
          ;;
     esac
     sleep 10
@@ -549,7 +563,7 @@ case "$ARG" in
         ;;
 
      run-backend)
-        $NODE_BIN $NODE_ARGS $SCRIPT -home $BKJS_HOME -debug -master -watch `pwd` $@
+        $NODE_BIN $NODE_ARGS $SCRIPT -home $BKJS_HOME -log debug -master -watch `pwd` $@
         ;;
 
      run-shell|bksh)
@@ -574,6 +588,7 @@ case "$ARG" in
     subnet=$(get_value "$info" subnet)
     major=$(get_value "$info" major)
     minor=$(get_value "$info" minor)
+    patch=$(get_value "$info" patch)
     dirs=$BKJS_SYNC/$name/
     dirs="$dirs $BKJS_SYNC/$name/$mode/"
     dirs="$dirs $BKJS_SYNC/$name/$mode/$major/"
@@ -586,9 +601,18 @@ case "$ARG" in
         rsync -aFF ${BKJS_DEBUG:-q} -e "ssh -l $BKJS_USER -y -o StrictHostKeyChecking=no -o ConnectTimeout=5 $BKJS_SSH_ARGS" $dirs $BKJS_HOME
     fi
     # Check for version change and run the restart command
-    nversion=$($NODE_BIN -e "try{console.log(JSON.parse(require('fs').readFileSync('package.json')).version)}catch(e){}")
-    [ "$BKJS_DEBUG" != "" ] && echo "old version: $version, new version: $nversion"
-    [ "$nversion" != "" -a "$version" != "$nversion" ] && npm restart
+    info2=$($0 run-shell -log none -no-db -no-dns -no-configure -show-info)
+    [ "$BKJS_DEBUG" != "" ] && $ECHO "old:\n$info\n, new:\n$info2"
+    version2=$(get_value "$info2" version)
+    major2=$(get_value "$info2" major)
+    minor2=$(get_value "$info2" minor)
+    patch2=$(get_value "$info2" patch)
+    [ "$version" = "$version2" ] && exit
+    if [ "$major2" != "" -a "$major" != "$major2" ]; then
+       npm restart
+    else
+       $0 restart-api
+    fi
     ;;
 
   run-update)
@@ -760,6 +784,23 @@ case "$ARG" in
     killall postgres
     ;;
 
+  init-redis)
+    echo 1 > /proc/sys/vm/overcommit_memory
+    echo never > /sys/kernel/mm/transparent_hugepage/enabled
+    chkconfig redis on
+    service redis restart
+    echo 'check process redis-server with pidfile "/var/run/redis.pid" start program = "/etc/init.d/redis start" stop program = "/etc/init.d/redis stop"' > /etc/monit.d/redis.conf
+    monit reload
+    ;;
+
+  run-redis)
+    redis-server $REDIS_CONF
+    ;;
+
+  stop-redis)
+    killall redis-server
+    ;;
+
   init-mysql)
     if [ ! -d $MYSQL_DIR/mysql ]; then
        db=$(get_arg -db backend)
@@ -889,6 +930,14 @@ case "$ARG" in
 
   stop-mongodb)
     kill $(ps agx|grep mongod|grep -v grep|awk '{print $1}')
+    ;;
+
+  show-instances)
+    name=$(get_arg -name)
+    region=$(get_arg -region us-east-1)
+    instances=$(aws ec2 describe-instances --region $region --filter "Name=instance-state-name,Values=running" "Name=tag:Name,Values=${name:-*}" --query 'Reservations[*].Instances[*].[InstanceId,PrivateIpAddress,Tags[?Key==`Name`]]' --output text|awk '{printf "%s ",$0;if($1=="Name")print "";}')
+    [ "$(get_flag -ip)" != "" ] && instances=$(echo "$instances"|awk '{print $2}')
+    echo "$instances"
     ;;
 
   show-help)
@@ -1022,7 +1071,7 @@ $(whoami)
 EOF
     fi
 
-    [ ! -e $NAME.sh ] && $ECHO "#!/bin/bash\n\nexec node $NAME.js -watch \$(pwd) -watch \$(pwd)/modules -web -debug -etc-dir \$(pwd)/etc -web-dir \$(pwd)/web -views-dir \$(pwd)/views -modules-dir \$(pwd)/modules \$@\n" > $NAME.sh && chmod 755 $NAME.sh
+    [ ! -e $NAME.sh ] && $ECHO "#!/bin/bash\n\nexec node $NAME.js -watch \$(pwd) -watch \$(pwd)/modules -web -log debug -etc-dir \$(pwd)/etc -web-dir \$(pwd)/web -views-dir \$(pwd)/views -modules-dir \$(pwd)/modules \$@\n" > $NAME.sh && chmod 755 $NAME.sh
     [ ! -e .gitignore ] && $ECHO "*~\n.*\n*.local\nbin/\ndocs/\nbuild/\ndeps/\nvar/\nfiles/\nimages/\ntmp/\nlog/\nnode_modules/\n" >> .gitignore
 
     if [ ! -e etc/config ]; then
@@ -1169,7 +1218,7 @@ EOF
   run-app)
     NAME=app
     [ "$1" != "" -a "${1:0:1}" != "-" ] && NAME=$1 && shift
-    $NODE_BIN $NAME.js -debug -watch `pwd` -web $@
+    $NODE_BIN $NAME.js -log debug -watch `pwd` -web $@
     ;;
 
   show-env)
@@ -1184,6 +1233,7 @@ EOF
     echo ""
     echo "  start - start the backend service"
     echo "  restart - restart the backend service"
+    echo "  restart-api - graceful API servers restart, drain all connections and restart one at a time"
     echo "  stop - stop the backend service"
     echo "  stop-web - kill Web worker processes so they will restart with possibly new node modules synced from the master host"
     echo "  install - [-user USER] [-home HOME] [-prefix $PREFIX] [-doman DOMAIN] [-host HOST] - make server setup and install all pakages including node and the $BKJS_MOD"
@@ -1218,6 +1268,9 @@ EOF
     echo "  init-pgsql [-db NAME] - setup and run the PostgreSQL server, install in $PG_PREFIX, data files in $PG_DIR, create initial database"
     echo "  run-pgsql - run local PostgreSQL server"
     echo "  stop-pgsql - stop local PostgreSQL server"
+    echo "  init-redis - setup Redis server to be run on start and to be monitored (Linux only)"
+    echo "  run-redis - run local Redis server, uses config file $REDIS_CONF"
+    echo "  stop-redis - stop local Redis server"
     echo "  init-dynamodb - download and install local DynamoDB, start the server"
     echo "  get-dynamodb - install local DynamoDB server in $BKJS_PREFIX/dynamodb"
     echo "  run-dynamodb - run local DynamoDB server installed in $BKJS_PREFIX/dynamodb, data files in $BKJS_HOME/var"
@@ -1244,6 +1297,7 @@ EOF
     echo "  build-backend - compile all required modules and libraries for the backend development(node.js, libs)"
     echo "  clean-backend - clean the source directory"
     echo "  clean-deps - clean dependencies binary and object files"
+    echo "  show-instances [-ip] [-region region] [-name name] - show running instances in region, optional tag pattern can be used for filter, -ip will show only IP addresses of instances"
     echo "  show-help - show all backend command line and config parameters"
     echo ""
     echo "bksh subcommands:"
