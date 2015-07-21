@@ -136,7 +136,6 @@ case "$ARG" in
   start)
     # Perform setup and possibly get newest source code if sync master is configured
     ($0 run-sync)
-    [ "$BKJS_UPDATE" != "" ] && ($0 run-update)
 
     echo "Starting $NODE_BIN $NODE_ARGS $SCRIPT -home $BKJS_HOME $BKJS_ARGS $@"
     $0 run-server
@@ -259,7 +258,7 @@ case "$ARG" in
        echo 'alias ps="ps augx"' >> $LHOME/.bashrc
        echo 'alias mc="mc -b"' >> $LHOME/.bashrc
        echo 'alias df="df -h"' >> $LHOME/.bashrc
-       echo 'bcp() { socat readline,history=~/.socat tcp4:localhost:208${1-0}; }' >> $LHOME/.bashrc
+       echo 'bcp() { socat readline,history=$HOME/.socat tcp4:localhost:$((2080+${1-0})); }' >> $LHOME/.bashrc
     fi
     ;;
 
@@ -616,13 +615,8 @@ case "$ARG" in
     ;;
 
   run-update)
-    # Update npm dependencies
-    cd $BKJS_HOME
-    if [ -f package.json ]; then
-       npm install
-    else
-       npm update backendjs
-    fi
+    [ -f package.json ] && modules=$(node -e 'console.log(Object.keys(JSON.parse(require("fs").readFileSync("package.json")).dependencies).join(" "))' | sed "s/$BKJS_MOD//g")
+    [ "$modules" != "" ] && npm install $modules $@
     ;;
 
   put-backend)
@@ -689,7 +683,6 @@ case "$ARG" in
     done
     # Files and dirs to backup
     BACKUP_FILES="/etc /home/$BKJS_USER $BKJS_HOME/etc $BKJS_HOME/web $BKJS_PREFIX $BACKUP_FILES"
-    ARCHIVED_FILES=""
     mkdir -p $BKJS_BACKUP
 
     # Database backup if exists
@@ -699,37 +692,37 @@ case "$ARG" in
        [ -e $PG_PREFIX ] && BACKUP_FILES="$BACKUP_FILES $PG_PREFIX"
        for d in $BACKUP_PG; do
          $PG_PREFIX/bin/pg_dump -Fc -U ${BACKUP_PG_USER:-postgres} $d > $BKJS_BACKUP/$FILE-$d.pgsql.dump
-         [ -f $BKJS_BACKUP/$FILE-$d.pgsql.dump ] && ARCHIVED_FILES="$ARCHIVED_FILES $BKJS_BACKUP/$FILE-$d.pgsql.dump"
+         [ -f $BKJS_BACKUP/$FILE-$d.pgsql.dump ] && BACKUP_ARCHIVE_FILES="$BACKUP_ARCHIVE_FILES $BKJS_BACKUP/$FILE-$d.pgsql.dump"
        done
     fi
     if [ "$BACKUP_MYSQL" != "" -a -d $MYSQL_DIR/mysql ]; then
        for d in $BACKUP_MYSQL; do
          $MYSQL_PREFIX/bin/mysqldump -u ${BACKUP_MYSQL_USER:-root} $d > $BKJS_BACKUP/$FILE-$d.mysql.dump
-         [ -f $BKJS_BACKUP/$FILE-$d.mysql.dump ] && ARCHIVED_FILES="$ARCHIVED_FILES $BKJS_BACKUP/$FILE-$d.mysql.dump"
+         [ -f $BKJS_BACKUP/$FILE-$d.mysql.dump ] && BACKUP_ARCHIVE_FILES="$BACKUP_ARCHIVE_FILES $BKJS_BACKUP/$FILE-$d.mysql.dump"
        done
     fi
 
     # Filesystem backup
     if [ "$BACKUP_FS" != "" ]; then
        tar $BACKUP_TAR_ARGS -czf $BKJS_BACKUP/$FILE.tar.gz $BACKUP_FILES 2>&1 |egrep -v "tar: Removing leading|tar:.+ignored|as we read it"
-       [ -f $BKJS_BACKUP/$FILE.tar.gz ] && ARCHIVED_FILES="$ARCHIVED_FILES $BKJS_BACKUP/$FILE.tar.gz"
+       [ -f $BKJS_BACKUP/$FILE.tar.gz ] && BACKUP_ARCHIVE_FILES="$BACKUP_ARCHIVE_FILES $BKJS_BACKUP/$FILE.tar.gz"
     fi
     # Allow to be managed by the user
     [ "$BACKUP_USER" != "" ] && chown -R $BACKUP_USER $BKJS_BACKUP
 
     # Files we just backed up
-    [ "$ARCHIVED_FILES" = "" ] && exit
+    [ "$BACKUP_ARCHIVE_FILES" = "" ] && exit
 
     # Send to remote host if configured, must be full ssh url with path like user@host:/path
     if [ "$BACKUP_REMOTE" != "" ]; then
        for h in $BACKUP_REMOTE; do
-         su - $BKJS_USER -c "scp -q $ARCHIVED_FILES $h"
+         su - $BKJS_USER -c "scp -q $BACKUP_ARCHIVE_FILES $h"
        done
     fi
 
     # Send to the S3 bucket using AWS tools
     if [ "$BACKUP_S3" != "" ]; then
-       for f in $ARCHIVED_FILES; do
+       for f in $BACKUP_ARCHIVE_FILES; do
          aws s3 cp $f $BACKUP_S3/$(basename $f) --quiet
        done
     fi
@@ -1087,21 +1080,13 @@ EOF
 #db-dynamodb-pool=http://localhost:8181
 #db-dynamodb-pool=us-east-1
 #db-mongodb=mongodb://localhost
-#db-cache-tables=bk_auth,bk_counter
-#aws-key=XXXXX
-#aws-secret=XXXXX
 #api-images-s3=S3BucketName
-#server-max-processes=2
-#api-unsecure=data,system
-#max-distance=160
+#server-max-processes=1
 #logwatcher-interval=3600
 #logwatcher-email=logwatcher@dot.com
-#server-jobs-interval=0
 #api-allow-path=^/open/url$
 #api-allow-admin=^/(system|data)
-#cache-host=10.1.1.1
-#msg-host=10.1.1.1
-#redis-host=10.1.1.1
+#cache-host=redis://10.1.1.1
 EOF
     fi
 
@@ -1261,7 +1246,7 @@ EOF
     echo "  run-backend - run local backend server or the app.js if present, all command line params will be passed to the backend.js"
     echo "  put-backend [-host HOST] [-path PATH] [-user USER] [-ssh-key pem] [-ssh OPTS] [-exclude PATTERN] [-delete] - push the backend code to the master server, uses env BKJS_HOST or host parameter from the command line, replaces all files and removes non-existing on the dest except in web/ directory, default path is ~/node_modules/$BKJS_MOD"
     echo "  run-sync - synchronize other directories from the master host, runs on the start, must use BKJS_SYNC in the profile set to the host name where to get files"
-    echo "  run-update - update the app frpm npm using package.json, runs on the start, must set BKJS_UPDATE in the profile to enable the update"
+    echo "  run-update [-g] - update all dependencies except the backend module from the package.json"
     echo "  run-check - to be run on instances, check for idleness,if no jobs running then shutdown the host"
     echo "  init-backup - creates a crontab file in /etc/cron.d to periodically run the backup, -args can be used to specify the full cron time spec"
     echo "  run-backup - run the backup script, store in \$BKJS_BACKUP, can be used in crontabs with symlink"
