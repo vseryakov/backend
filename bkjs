@@ -19,7 +19,6 @@ case "$PLATFORM" in
     # In multi-OS environment have to sync by OS type due to different dependencies in each distro
     [ "$PG_PREFIX" = "" ] && PG_PREFIX=$(find /usr -maxdepth 1 -name 'pgsql*' -type d -print|sort -r|head -1)
     [ -f /etc/sysconfig/$BKJS ] && . /etc/sysconfig/$BKJS
-    [ "$REDIS_CONF" = "" -a -f /etc/redis.conf ] && REDIS_CONF=/etc/redis.conf
     KILLALL="killall -qr"
     ECHO="echo -e"
     SED="sed -i"
@@ -31,6 +30,7 @@ case "$PLATFORM" in
     [ "$BKJS_PREFIX" = "" ] && export BKJS_PREFIX=/opt/local
     [ "$PG_PREFIX" = "" ] && export PG_PREFIX=$(find $BKJS_PREFIX/lib -maxdepth 1 -name 'postgresql*' -type d -print|sort -r|head -1) && PG_LIBDIR=$PG_PREFIX
     [ "$MYSQL_PREFIX" = "" ] && export MYSQL_PREFIX=$(find $BKJS_PREFIX/lib -maxdepth 1 -name 'mysql*' -type d -print|sort -r|head -1)
+    [ "$REDIS_PREFIX" = "" ] && REDIS_PREFIX=/opt/local
     KILLALL="killall -m"
     ECHO=echo
     SED="sed -i .orig"
@@ -118,7 +118,7 @@ export BKJS_RSYNC_ARGS=$(concat_arg -rsync $BKJS_RSYNC_ARGS)
 [ "$MONGO_DIR" = "" ] && export MONGO_DIR=$BKJS_HOME/mongo
 [ "$BKJS_IDLETIME" = "" ] && export BKJS_IDLETIME=900
 [ "$BKJS_UPTIME" = "" ] && export BKJS_UPTIME=43200
-[ "$REDIS_CONF" = "" ] && export REDIS_CONF=$BKJS_PREFIX/etc/redis.conf
+[ "$REDIS_PREFIX" = "" ] && export REDIS_PREFIX=$BKJS_HOME
 
 # Setup paths
 export PATH=$BKJS_HOME/bin:$BKJS_HOME/node_modules/.bin:$BKJS_PREFIX/bin:$PG_PREFIX/bin:$CASSANDRA_PREFIX/bin:/sbin:/usr/sbin:/usr/local/bin:/opt/local/bin:$PATH
@@ -149,6 +149,7 @@ case "$ARG" in
 
   restart-api)
     $KILLALL -USR2 "$BKJS: server"
+    $KILLALL -USR2 "$BKJS: master"
     exit 0
     ;;
 
@@ -588,24 +589,25 @@ case "$ARG" in
     major=$(get_value "$info" major)
     minor=$(get_value "$info" minor)
     patch=$(get_value "$info" patch)
+    tag=$(echo $(get_value "$info" tag)|awk -F- '{print $1}')
     dirs=$BKJS_SYNC/$name/
-    dirs="$dirs $BKJS_SYNC/$name/$mode/"
-    dirs="$dirs $BKJS_SYNC/$name/$mode/$major/"
-    dirs="$dirs $BKJS_SYNC/$name/$mode/$major/$minor/"
-    [ "$network" != "" ] && dirs="$dirs $BKJS_SYNC/$name/$network/"
-    [ "$subnet" != "" ] && dirs="$dirs $BKJS_SYNC/$name/$subnet/"
+    dirs="$dirs $BKJS_SYNC/$mode/"
+    dirs="$dirs $BKJS_SYNC/$name/$major.$minor/"
+    [ "$network" != "" ] && dirs="$dirs $BKJS_SYNC/$network/"
+    [ "$subnet" != "" ] && dirs="$dirs $BKJS_SYNC/$subnet/"
+    [ "$tag" != "" -a "$tag" != "$name" ] && dirs="$dirs $BKJS_SYNC/$tag/"
     if [[ $BKJS_SYNC =~ ^s3:// ]]; then
-       for dir in $dirs; do echo aws s3 sync $dir $BKJS_HOME ${BKJS_DEBUG:--quiet} --recursive; done
+       region=$(get_value "$info" region)
+       for dir in $dirs; do echo aws s3 sync $dir $BKJS_HOME ${BKJS_DEBUG:--quiet} --recursive --region $region; done
     else
         rsync -aFF ${BKJS_DEBUG:-q} -e "ssh -l $BKJS_USER -y -o StrictHostKeyChecking=no -o ConnectTimeout=5 $BKJS_SSH_ARGS" $dirs $BKJS_HOME
     fi
     # Check for version change and run the restart command
     info2=$($0 run-shell -log none -no-db -no-dns -no-configure -show-info)
-    [ "$BKJS_DEBUG" != "" ] && $ECHO "old:\n$info\n, new:\n$info2"
+    [ "$BKJS_DEBUG" != "" ] && $ECHO "OLD:\n$info\nNEW:\n$info2"
     version2=$(get_value "$info2" version)
     major2=$(get_value "$info2" major)
     minor2=$(get_value "$info2" minor)
-    patch2=$(get_value "$info2" patch)
     [ "$version" = "$version2" ] && exit
     if [ "$major2" != "" -a "$major" != "$major2" ]; then
        npm restart
@@ -777,7 +779,67 @@ case "$ARG" in
     killall postgres
     ;;
 
+  install-redis)
+    # Install redis server
+    [ "$(whoami)" != "root" ] && echo "Run as root please" && exit 1
+    yum remove -y redis
+    yum install -y jemalloc
+
+    ver=$(get_arg -version 2.8.21)
+    curl -L -o redis.tgz http://download.redis.io/releases/redis-$ver.tar.gz
+
+    mkdir -p redis
+    tar -C redis --strip-components=1 -xzf redis.tgz
+    make -C redis install PREFIX=$REDIS_PREFIX
+    sed -e 's|^# syslog-enabled no|syslog-enabled yes|' \
+        -e "s|^dir ./|dir $REDIS_PREFIX/var/|" \
+        -e "s|^logfile \"\"|logfile $REDIS_PREFIX/log/redis.log|" \
+        -e 's|^daemonize no|daemonize yes|' redis/redis.conf > $REDIS_PREFIX/etc/redis.conf
+    rm -rf redis redis.tgz
+
+    cat > /etc/init.d/redis << EOF
+#!/bin/sh
+#
+# redis        init file for starting up the redis daemon
+#
+# chkconfig:   - 20 80
+# description: Starts and stops the redis daemon.
+
+case "\$1" in
+ start)
+    echo "Starting redis: "
+    $REDIS_PREFIX/bin/redis-server $REDIS_PREFIX/etc/redis.conf
+    ;;
+  stop)
+    echo "Stopping redis: "
+    killall -q redis-server
+    ;;
+  restart)
+    \$0 stop
+    \$0 start
+    ;;
+  *)
+    echo $"Usage: \$0 {start|stop|restart}"
+    exit 2
+esac
+EOF
+
+    cat > /etc/logrotate.d/redis <<EOF
+$REDIS_PREFIX/log/redis.log {
+  weekly
+  rotate 10
+  copytruncate
+  delaycompress
+  compress
+  notifempty
+  missingok
+}
+EOF
+    chmod 755 /etc/init.d/redis
+    ;;
+
   init-redis)
+    [ "$(whoami)" != "root" ] && echo "Run as root please" && exit 1
     echo 1 > /proc/sys/vm/overcommit_memory
     echo never > /sys/kernel/mm/transparent_hugepage/enabled
     chkconfig redis on
@@ -787,7 +849,7 @@ case "$ARG" in
     ;;
 
   run-redis)
-    redis-server $REDIS_CONF
+    redis-server $REDIS_PREFIX/etc/redis.conf
     ;;
 
   stop-redis)
@@ -929,7 +991,7 @@ case "$ARG" in
     name=$(get_arg -name)
     region=$(get_arg -region us-east-1)
     instances=$(aws ec2 describe-instances --region $region --filter "Name=instance-state-name,Values=running" "Name=tag:Name,Values=${name:-*}" --query 'Reservations[*].Instances[*].[InstanceId,PrivateIpAddress,Tags[?Key==`Name`]]' --output text|awk '{printf "%s ",$0;if($1=="Name")print "";}')
-    [ "$(get_flag -ip)" != "" ] && instances=$(echo "$instances"|awk '{print $2}')
+    [ "$(get_flag -showip)" != "" ] && instances=$(echo "$instances"|awk '{print $2}')
     echo "$instances"
     ;;
 
@@ -1086,7 +1148,7 @@ EOF
 #logwatcher-email=logwatcher@dot.com
 #api-allow-path=^/open/url$
 #api-allow-admin=^/(system|data)
-#cache-host=redis://10.1.1.1
+#api-cache=redis://10.1.1.1
 EOF
     fi
 
@@ -1253,6 +1315,7 @@ EOF
     echo "  init-pgsql [-db NAME] - setup and run the PostgreSQL server, install in $PG_PREFIX, data files in $PG_DIR, create initial database"
     echo "  run-pgsql - run local PostgreSQL server"
     echo "  stop-pgsql - stop local PostgreSQL server"
+    echo "  install-redis - install Redis server into $REDIS_PREFIX, removes current redis package if installed (Linux only)"
     echo "  init-redis - setup Redis server to be run on start and to be monitored (Linux only)"
     echo "  run-redis - run local Redis server, uses config file $REDIS_CONF"
     echo "  stop-redis - stop local Redis server"
@@ -1282,10 +1345,12 @@ EOF
     echo "  build-backend - compile all required modules and libraries for the backend development(node.js, libs)"
     echo "  clean-backend - clean the source directory"
     echo "  clean-deps - clean dependencies binary and object files"
-    echo "  show-instances [-ip] [-region region] [-name name] - show running instances in region, optional tag pattern can be used for filter, -ip will show only IP addresses of instances"
+    echo "  show-instances [-ip] [-region region] [-name name] - show running instances in region, optional tag pattern can be used for filter, -showip will show only IP addresses of instances"
     echo "  show-help - show all backend command line and config parameters"
     echo ""
-    echo "bksh subcommands:"
+    echo "bksh commands:"
+    echo "if any of the commands below is specified it is exetued and then exit, otherwise bksh launches interactive shell"
+    echo ""
     echo "  -show-info - show app and version information"
     echo "  -account-add [-scramble] login LOGIN secret SECRET [name NAME] [email EMAIL] [type TYPE] ... - add a new user for API access, any property from bk_account can be passed in the form: name value, if -scramble is given, store HMAC for login/secret, not real values "
     echo "  -account-update [-scramble] [login LOGIN|id ID] [name NAME] [email EMAIL] [type TYPE] ... - update existing user properties, any property from bk_account can be passed in the form: name value "
@@ -1293,8 +1358,6 @@ EOF
     echo "  -location-put [login LOGIN|id ID] latitude LAT longitude LON ... - update location for an account"
     echo "  -send-request -url URL [-id ID|-login LOGIN] param value param value ... - send API request to the server specified in the url as user specified by login or account id, resolving the user is done directly from the current db pool, param values should not be url-encoded"
     echo "  -log-watch - run logwatcher and exit, send emails in case any errors found"
-    echo "  -s3-get -path PATH - retrieve a file from S3"
-    echo "  -s3-put -path PATH -fle FILE - store a file to S3"
     echo "  -db-get-config [-separator =] [-format text] [-run-mode MODE] [-app-name NAME] [name VALUE ...] - show all config parameters retrieved from the remote database bk_config table for the current environment, to simulate another environment pass the following arguments as name value pairs: network, subnet, ipaddr"
     echo "  -db-tables [-separator nl] - list all table names for the current db pool"
     echo "  -db-select -table TABLE [-separator !] [-format text] [name VALUE ...] - return all records from the table or only that match given column values, all supported by db.select options are supported by prefixing with underscore like _count 10, the format is the same as for API query parameters"
@@ -1306,6 +1369,21 @@ EOF
     echo "  -db-drop -table TABLE name [-nowait] - drop a table"
     echo "  -db-backup [-path PATH] [-tables LIST] - save tables into json files in the home or specified path"
     echo "  -db-restore [-path PATH] [-tables LIST] [-drop] [-continue] - restore tables from json files located the home or specified path"
+    echo "  -aws-s3-get -path PATH - retrieve a file from S3"
+    echo "  -aws-s3-put -path PATH -file FILE - store a file to S3"
+    echo "  -aws-show-amazon-images [-filter PATTERN] [-arch ARCH] [-rootdev DEV] - show Amazon Linux AMIs"
+    echo "  -aws-show-images [-filter PATTERN] - show my account AMIs by name pattern"
+    echo "  -aws-delete-image -filter PATTERN [-dry-run] - delete all AMIs that match the given name filter"
+    echo "  -aws-create-image [-name NAME] [-descr DESCR] [-no-reboot] [-reboot] [-instance-id ID] [-dry-run] - create a new AMI from the instance by id or the current instance"
+    echo "  -aws-launch-instances [-count NUM] [-image-name PATTERN] [-tag-name NAME] [-group-name PATTERN] [-subnet-name PATTERN] [-subnet-split] [-subnet-each] [-user-data TEXT] [-alarm-name NAME] [-wait] [wait-timeout MSECS] [-wait-delay MSECS] [-dry-run] - start instance(s), the app name from the package.json is used as the base for all other resources unless explicitely defined in the command line"
+    echo "  -aws-reboot-instances -filter PATTERN [-dry-run] - reboot instances by tag pattern"
+    echo "  -aws-terminate-instances -filter PATTERN [-count NUM] [-dry-run] - terminate instances by tag pattern"
+    echo "  -aws-show-instances [-filter PATTERN] [-show-ip] - show running instances by tag pattern"
+    echo "  -aws-show-elb -elb-name NAME [-filter PATTERN] - show instances for an ELB"
+    echo "  -aws-reboot-elb -elb-name NAME [-timeout MSECS] [-interval MSECS] [-dry-run]"
+    echo "  -aws-replace-elb -elb-name NAME [-timeout MSECS] [-interval MSECS] [-dry-run]"
+    echo "  -aws-setup-ssh -group-name NAME [-close] [-dry-run]"
+    echo "  -aws-setup-instance [-cmd CMD] [-file FILE ] [-wait] [-dry-run]"
     echo ""
     echo "Common options:"
     echo "  -root path - path to the backend home directory, default is $BKJS_HOME"
