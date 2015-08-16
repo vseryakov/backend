@@ -52,33 +52,31 @@
 
      Features:
      <ul>
-     <li> Exposes a set of Web service APIs over HTTP(S) using Express framework.</li>
-     <li> Database API supports Sqlite, PostgreSQL, MySQL, DynamoDB, Cassandra, MongoDB, Redis with all basic operations behaving the
-       same way allowing to switch databases without changing the code.</li>
-     <li> Database driver for LevelDB, LMDB, CouchDB, Riak, ElasticSearch support only a subset of all database operations</li>
-     <li> Easily extendable to support any kind of database, provides a database driver on top of Redis with all supported methods.
-      Provides accounts, connections, locations, messaging and icons APIs with basic functionality for a qucik start.</li>
-     <li> Supports crontab-like and on-demand scheduling for local and remote(AWS) jobs.</li>
-     <li> Authentication is based on signed requests using API key and secret, similar to Amazon AWS signing requests.</li>
-     <li> Runs web server as separate processes to utilize multiple CPU cores.</li>
-     <li> Local jobs are executed by spawned processes</li>
-     <li> Supports WebSockets connections and process them with the same Express routes as HTTP requests</li>
-     <li> Supports several cache modes(Redis, memcached, LRU) for the database operations.</li>
-     <li> Supports several PUB/SUB modes of operations using nanomsg, Redis, RabbitMQ.</li>
-     <li> Supports common database operations (Get, Put, Del, Update, Select) for all databases using the same DB API.</li>
-     <li> ImageMagick is compiled as C++ module for in-process image scaling.</li>
-     <li> nanomsg interface for messaging between processes and servers.</li>
-     <li> REPL(command line) interface for debugging and looking into server internals.</li>
-     <li> Geohash based location searches supported by all databases drivers.</li>
-     <li> Supports push notifications for mobile devices, APN and GCM</li>
-     <li> Supports HTTP(S) reverse proxy mode where multiple Web workers are load-balanced by the proxy
-       server running in the master process instead of relying on the OS scheduling between processes listening on the same port.</li>
-     <li> Can be used with any MVC, MVVC or other types of frameworks that work on top or with the Express server.</li>
-     <li> Support runtime metrics about the timing on database, requests, cache, memory and request rate limit control </li>
-     <li> Hosted on https://github.com/vseryakov/backendjs (http://bkjs.io) </li>
-     <li> BSD licensed.</li>
-     </ul>
-
+<li>Exposes a set of Web service APIs over HTTP(S) using Express framework.</li>
+<li>Database API supports Sqlite, PostgreSQL, MySQL, DynamoDB, Cassandra, MongoDB, Redis with all basic operations behaving the
+same way allowing to switch databases without changing the code.</li>
+<li>Database driver for LevelDB, LMDB, CouchDB, Riak, ElasticSearch support only a subset of all database operations</li>
+<li>Easily extendable to support any kind of database, provides a database driver on top of Redis with all supported methods.</li>
+<li>Provides accounts, connections, locations, messaging and icons APIs with basic functionality for a qucik start.</li>
+<li>Supports crontab and queue job processing by seperate workers.</li>
+<li>Authentication is based on signed requests using API key and secret, similar to Amazon AWS signing requests.</li>
+<li>Runs web server as separate processes to utilize multiple CPU cores.</li>
+<li>Supports WebSockets connections and process them with the same Express routes as HTTP requests</li>
+<li>Supports several cache modes(Redis, memcached, LRU) for the database operations.</li>
+<li>Supports several PUB/SUB modes of operations using Redis, RabbitMQ.</li>
+<li>Supports jobs processing using several work queue implementations on top of RabbitMQ, Redis, DB</li>
+<li>Supports common database operations (Get, Put, Del, Update, Select) for all databases using the same DB API.</li>
+<li>ImageMagick is compiled as C++ module for in-process image scaling.</li>
+<li>REPL(command line) interface for debugging and looking into server internals.</li>
+<li>Geohash based location searches supported by all databases drivers.</li>
+<li>Supports push notifications for mobile devices, APN and GCM</li>
+<li>Supports HTTP(S) reverse proxy mode where multiple Web workers are load-balanced by the proxy
+server running in the master process instead of relying on the OS scheduling between processes listening on the same port.</li>
+<li>Can be used with any MVC, MVVC or other types of frameworks that work on top or with the Express server.</li>
+<li>Intergated very light unit testing facility which can be used to test modules and API requests</li>
+<li>Support runtime metrics about the timing on database, requests, cache, memory and request rate limit control</li>
+<li>Hosted on <a href="https://github.com/vseryakov/backendjs">github</a>, BSD licensed.</li>
+    </ul>
     </div>
 
     <footer class="footer">
