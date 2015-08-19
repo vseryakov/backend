@@ -86,6 +86,7 @@ get_value() {
 
 # Global options that are used thoughout the script
 export BKJS_DEBUG=$(get_arg -debug $BKJS_DEBUG)
+export BKJS_DRY_RUN=$(get_flag -dry-run $BKJS_DRY_RUN)
 export BKJS_HOME=$(get_arg -home $BKJS_HOME)
 export BKJS_PREFIX=$(get_arg -prefix $BKJS_PREFIX)
 export BKJS_USER=$(get_arg -user $BKJS_USER)
@@ -633,9 +634,11 @@ case "$ARG" in
     [ "$BKJS_USER" != "$(whoami)" ] && BKJS_SSH_ARGS="$BKJS_SSH_ARGS -l $BKJS_USER"
     key=$(get_arg -ssh-key)
     [ "$key" != "" ] && BKJS_SSH_ARGS="$BKJS_SSH_ARGS -i $HOME/.ssh/$key.pem"
+    files=$(get_arg -files)
+    [ "$files" = "" ] && files=$(ls)
     for h in $BKJS_HOST; do
-        echo "Deploying the module to $BKJS_SSH_ARGS $BKJS_RSYNC_ARGS $h:$BKJS_PATH"
-        rsync -av $BKJS_DEBUG -e "ssh $BKJS_SSH_ARGS" $BKJS_RSYNC_ARGS `ls` $h:$BKJS_PATH
+        echo "Deploying the module $mod: -e 'ssh $BKJS_SSH_ARGS' $BKJS_RSYNC_ARGS $(echo $files) $h:$BKJS_PATH"
+        [ "$BKJS_DRY_RUN" = "" ] && rsync -av $BKJS_DEBUG -e "ssh $BKJS_SSH_ARGS" $BKJS_RSYNC_ARGS $files $h:$BKJS_PATH
     done
     ;;
 
@@ -889,7 +892,7 @@ EOF
   get-dynamodb)
     if [ ! -d $DYNAMODB_PREFIX ]; then
        mkdir -p $DYNAMODB_PREFIX
-       curl -L -o ddb.tar.gz http://dynamodb-local.s3-website-us-west-2.amazonaws.com/dynamodb_local_2014-10-07.tar.gz
+       curl -L -o ddb.tar.gz http://dynamodb-local.s3-website-us-west-2.amazonaws.com/dynamodb_local_latest.tar.gz
        tar -C $DYNAMODB_PREFIX -xzf ddb.tar.gz
        rm -rf ddb.tar.gz
     fi
@@ -897,7 +900,8 @@ EOF
 
   run-dynamodb)
     mkdir -p $BKJS_HOME/var $BKJS_HOME/log
-    (cd $BKJS_HOME/var && exec nohup java -Djava.library.path=$DYNAMODB_PREFIX/DynamoDBLocal_lib -jar $DYNAMODB_PREFIX/DynamoDBLocal.jar --port 8181 >>$BKJS_HOME/log/message.log 2>&1 &)
+    params="-Xmx$(get_arg -xmx 250M)"
+    exec nohup java $params -Djava.library.path=$DYNAMODB_PREFIX/DynamoDBLocal_lib -jar $DYNAMODB_PREFIX/DynamoDBLocal.jar -dbPath $BKJS_HOME/var -sharedDb -delayTransientStatuses -optimizeDbBeforeStartup -port 8181 >>$BKJS_HOME/log/message.log 2>&1 &
     ;;
 
   stop-dynamodb)
@@ -937,11 +941,15 @@ EOF
   init-elasticsearch)
     ($0 get-elasticsearch)
     ($0 run-elasticsearch)
+    if [ "$PLATFORM" = "Linux" ]; then
+       echo "check process java with pidfile \"$BKJS_HOME/var/elasticsearch.pid\" start program = \"$0 run-elasticsearch\" stop program = \"$0 stop-elasticsearch\"" > /etc/monit.d/elasticsearch.conf
+       monit reload
+    fi
     ;;
 
   get-elasticsearch)
     if [ ! -d $ELASTICSEARCH_PREFIX ]; then
-        file=elasticsearch-1.5.2.tar.gz
+        file=elasticsearch-1.7.1.tar.gz
         mkdir -p $ELASTICSEARCH_PREFIX
         curl -OL https://download.elasticsearch.org/elasticsearch/elasticsearch/$file
         tar -C $ELASTICSEARCH_PREFIX --strip-components=1 -xzf $file
@@ -950,11 +958,11 @@ EOF
     ;;
 
   run-elasticsearch)
-    $ELASTICSEARCH_PREFIX/bin/elasticsearch -d >>$BKJS_HOME/log/message.log 2>&1
+    $ELASTICSEARCH_PREFIX/bin/elasticsearch -p $BKJS_HOME/var/elasticsearch.pid -d >>$BKJS_HOME/log/message.log 2>&1
     ;;
 
   stop-elasticsearch)
-    kill $(ps agx|grep elasticsearch|grep -v grep|awk '{print $1}')
+    kill $(ps agx|grep org.elasticsearch|grep -v grep|awk '{print $1}')
     ;;
 
   get-mongodb)
@@ -1358,6 +1366,7 @@ EOF
     echo "  -location-put [login LOGIN|id ID] latitude LAT longitude LON ... - update location for an account"
     echo "  -send-request -url URL [-id ID|-login LOGIN] param value param value ... - send API request to the server specified in the url as user specified by login or account id, resolving the user is done directly from the current db pool, param values should not be url-encoded"
     echo "  -log-watch - run logwatcher and exit, send emails in case any errors found"
+    echo "  -test-run -test-cmd CMD - run a test command in the shell, autoload tests.js"
     echo "  -db-get-config [-separator =] [-format text] [-run-mode MODE] [-app-name NAME] [name VALUE ...] - show all config parameters retrieved from the remote database bk_config table for the current environment, to simulate another environment pass the following arguments as name value pairs: network, subnet, ipaddr"
     echo "  -db-tables [-separator nl] - list all table names for the current db pool"
     echo "  -db-select -table TABLE [-separator !] [-format text] [name VALUE ...] - return all records from the table or only that match given column values, all supported by db.select options are supported by prefixing with underscore like _count 10, the format is the same as for API query parameters"
@@ -1367,8 +1376,8 @@ EOF
     echo "  -db-del -table TABLE name VALUE ... - delete a record from the table, name value pairs must define a primary key for the table"
     echo "  -db-del-all -table TABLE name VALUE ... - delete all records from the table that match the search criteria, name value pairs must define a primary key for the table"
     echo "  -db-drop -table TABLE name [-nowait] - drop a table"
-    echo "  -db-backup [-path PATH] [-tables LIST] - save tables into json files in the home or specified path"
-    echo "  -db-restore [-path PATH] [-tables LIST] [-drop] [-continue] - restore tables from json files located the home or specified path"
+    echo "  -db-backup [-path PATH] [-tables LIST] [-skip LIST] - save tables into json files in the home or specified path"
+    echo "  -db-restore [-path PATH] [-tables LIST] [-skip LIST] [-drop] [-continue] - restore tables from json files located in the home or specified path"
     echo "  -aws-s3-get -path PATH - retrieve a file from S3"
     echo "  -aws-s3-put -path PATH -file FILE - store a file to S3"
     echo "  -aws-show-amazon-images [-filter PATTERN] [-arch ARCH] [-rootdev DEV] - show Amazon Linux AMIs"
