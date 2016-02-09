@@ -3,7 +3,7 @@
 #  Author: Vlad Seryakov vseryakov@gmail.com
 #  Sep 2013
 #
-# chkconfig: 2345 97 97
+# chkconfig: 2345 91 91
 # description: backendjs server
 #
 
@@ -84,6 +84,18 @@ get_value() {
   echo ${v:-$3}
 }
 
+# Return config parameter value by name
+get_config() {
+  for ((i = 0;i < ${#ARGS[@]}; ++i)); do
+    [ "$2" = "${ARGS[i]}" ] && eval "$1=${ARGS[i+1]}" && return 0
+  done
+  [ -z $DB_ARGS ] && DB_ARGS=(`$BKJS_GET_CONFIG`)
+  for ((i = 0;i < ${#DB_ARGS[@]}; ++i)); do
+    [ "$2" = "${DB_ARGS[i]}" ] && eval "$1=${DB_ARGS[i+1]}" && return
+  done
+  [ "$3" != "" ] && eval "$1=$3"
+}
+
 # Home must be specified for the script to work properly
 export BKJS_HOME=$(get_arg -home $BKJS_HOME)
 [ "$BKJS_HOME" = "" ] && export BKJS_HOME=$(sh -c "echo ~$BKJS_USER")
@@ -102,6 +114,7 @@ export BKJS_PATH=$(get_arg -path $BKJS_PATH)
 export BKJS_ARGS=$(concat_arg -args $BKJS_ARGS)
 export BKJS_SSH_ARGS=$(concat_arg -ssh $BKJS_SSH_ARGS)
 export BKJS_RSYNC_ARGS=$(concat_arg -rsync $BKJS_RSYNC_ARGS)
+export BKJS_GET_CONFIG="$0 run-shell -log none -db-get-config -format args $@"
 
 # Setup all variables with the defaults
 [ "$BKJS_HOST" = "" ] && export BKJS_HOST=$(uname -n|awk -F. '{print $1}')
@@ -502,9 +515,6 @@ case "$ARG" in
     $ECHO "set daemon 30 with start delay 60" > /etc/monit.d/system.conf
     $ECHO "check system localhost if loadavg(1min) > 5 for 10 cycles then exec \"$0 send-alert\"" >> /etc/monit.d/system.conf
     $ECHO "check filesystem rootfs with path / if space usage > 90% for 3 times within 5 cycles then exec exec \"$0 send-alert\"" >> /etc/monit.d/system.conf
-
-    alert=$(get_arg -alert_email)
-    [ "$alert" != "" ] && echo "set alert $alert" >> /etc/monit.d/system.conf
     monit reload
     ;;
 
@@ -580,17 +590,45 @@ case "$ARG" in
     yum -y -q install $packages
     ;;
 
+  init-alerts)
+    get_config user -alert-user
+    get_config host -alert-host
+    get_config password -alert-password
+    get_config email -alert-email
+    get_config topic -alert-topic
+    if [ "$email" != "" ]; then
+       echo "Init monit alert: $email, $host, $user"
+       $ECHO "set alert $email" > /etc/monit.d/alert.conf
+       $ECHO "set mail-format { from: $email }" >> /etc/monit.d/alert.conf
+       [ "$user" != "" ] && user="username $user"
+       [ "$password" != "" ] && password="password $password"
+       [ "$host" != "" ] && $ECHO "set mailserver localhost, $host $user $password using hostname $(uname -n)" >> /etc/monit.d/alert.conf
+       monit reload
+    fi
+    if [ "$topic" != "" ]; then
+       [ "$(grep -s $topic $BKJS_HOME/etc/config.local)" = "" ] && echo "aws-alert-topic=$topic" >> $BKJS_HOME/etc/config.local
+    fi
+    ;;
+
   send-alert)
     event=$(get_arg -event $MONIT_EVENT)
     descr=$(get_arg -descr $MONIT_DESCRIPTION)
-    [ "$event" = " -a "$descr" = " ] && exit
+    [ "$event" = "" -a "$descr" = "" ] && exit
     host=${MONIT_HOST:-$(uname -n)}
     ip=$(ifconfig eth0|grep 'inet '|sed 's/addr://'|awk '{print $2}')
     msg=$($ECHO "ALERT: $host/$ip $event\n\n$descr\n\n$(df -h)\n\n$(top -bn1)")
     echo "$msg" >> $BKJS_HOME/log/error.log
-    region=$(get_arg -region $(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone/|sed 's/[a-z]$//'))
-    [ "$region" != "" ] && topic=$(aws sns list-topics --region $region --output text|head -1|awk '{print $NF}')
-    [ "$topic" != "" ] && aws sns publish --region $region --topic-arn $topic --message "$msg"
+    topic=$(grep aws-alert-topic $BKJS_HOME/etc/config*|head -1|awk -F= '{print $2}')
+    if [ "$topic" != "" ]; then
+       region=$(get_arg -region)
+       [ "$region" != "" ] && region="--region $region"
+       aws sns publish $region --topic-arn $topic --message "$msg"
+       [ "$?" = "0" ] && exit
+    fi
+    email=$(grep 'set alert' /etc/monit.d/*|tail -1|awk '{print $NF}')
+    if [ "$email" != "" ]; then
+       $ECHO "From:$email\nTo:$email\nSubject: $msg" |sendmail $email
+    fi
     ;;
 
   run|run-master|run-monitor|run-watcher|run-shell|bkjs|bksh)
@@ -626,8 +664,11 @@ case "$ARG" in
     ;;
 
   run-setup)
+    [ "$(whoami)" != "root" ] && echo "Not root, skipping setup" && exit 1
     # Setup domain from the config, keep the hostname as it is, for EC2 instances it is the IP address
     [ "$BKJS_DOMAIN" != "" ] && $0 init-hostname -domain $BKJS_DOMAIN
+    [ "$OS_TYPE" = "amazon" ] && aws configure set region $(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone/|sed 's/[a-z]$//')
+    $0 init-alerts
     $0 run-sync
     ;;
 
@@ -887,7 +928,7 @@ case "$ARG" in
     if [ "$(grep -s 'transparent_hugepage' /etc/rc.local)" = "" ]; then
        echo 'echo never > /sys/kernel/mm/transparent_hugepage/enabled' >> /etc/rc.local
     fi
-    $ECHO "/home/ec2-user/log/redis.log {\n  weekly\n  rotate 10\n  copytruncate\n  delaycompress\n  compress\n  notifempty\n  missingok\n}" > /etc/logrotate.d/redis
+    $ECHO "$REDIS_PREFIX/log/redis.log {\n  weekly\n  rotate 10\n  copytruncate\n  delaycompress\n  compress\n  notifempty\n  missingok\n}" > /etc/logrotate.d/redis
     $ECHO "check process redis-server with pidfile \"$REDIS_PREFIX/var/redis.pid\" start program = \"$0 run-redis $@\" as uid $BKJS_USER and gid $BKJS_GROUP stop program = \"$0 stop-redis\"" > /etc/monit.d/redis.conf
     monit reload
     ;;
@@ -904,7 +945,31 @@ case "$ARG" in
     ;;
 
   stop-redis)
-    killall redis-server
+    $KILLALL redis-server
+    ;;
+
+  init-sentinel-service)
+    host=$(get_arg -host 127.0.0.1)
+    port=$(get_arg -port 6379)
+    quorum=$(get_arg -quorum 2)
+    name=$(get_arg -name redis)
+    conf=$REDIS_PREFIX/etc/sentinel.conf
+    $ECHO "daemonize yes" > $conf
+    $ECHO "syslog-enabled yes" >> $conf
+    $ECHO "sentinel monitor $name $host $port $quorum" >> $conf
+    $ECHO "dir $REDIS_PREFIX/var/" >> $conf
+    $ECHO "pidfile $REDIS_PREFIX/var/sentinel.pid" >> $conf
+
+    $ECHO "check process redis-sentinel with pidfile \"$REDIS_PREFIX/var/sentinel.pid\" start program = \"$0 run-sentinel $@\" as uid $BKJS_USER and gid $BKJS_GROUP stop program = \"$0 stop-sentinel\"" > /etc/monit.d/sentinel.conf
+    monit reload
+    ;;
+
+  run-sentinel)
+    $REDIS_PREFIX/bin/redis-sentinel $REDIS_PREFIX/etc/sentinel.conf
+    ;;
+
+  stop-sentinel)
+    $KILLALL redis-sentinel
     ;;
 
   init-mysql)
@@ -1068,10 +1133,11 @@ case "$ARG" in
     ;;
 
   show-instances)
-    region=$(get_arg -region $(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone/|sed 's/[a-z]$//'))
+    region=$(get_arg -region)
+    [ "$region" != "" ] && region="--region $region"
     name=$(get_arg -name)
     [ "$name" != "" ] && tags="Name=tag:Name,Values=${name}"
-    instances=$(aws ec2 describe-instances --region $region --filter "Name=instance-state-name,Values=running" $tags --query 'Reservations[*].Instances[*].[InstanceId,PrivateIpAddress,PublicIpAddress,Tags[?Key==`Name`]]' --output text|awk '{if($4=="None")print $0;else if($1=="Name")print $2;else printf "%s ",$0;}')
+    instances=$(aws ec2 describe-instances $region --filter "Name=instance-state-name,Values=running" $tags --query 'Reservations[*].Instances[*].[InstanceId,PrivateIpAddress,PublicIpAddress,Tags[?Key==`Name`]]' --output text|awk '{if($4=="None")print $0;else if($1=="Name")print $2;else printf "%s ",$0;}')
     [ "$(get_flag -showip)" != "" ] && instances=$(echo "$instances"|awk '{print $2}')
     echo "$instances"
     ;;
@@ -1316,8 +1382,9 @@ EOF
     echo "  init-logrotate - setup logrotate for the backend log files"
     echo "  init-rsyslog - setup rsyslog to use for the backend logging, access log and backend log"
     echo "  init-system - setup system wide parameters, tuniing, limits, permissions"
-    echo "  init-monit-system [-alert EMAIL] - setup system monitoring with monit, CPU, disk, send alert via '$0 send-alert' command"
+    echo "  init-monit-system - setup system monitoring with monit, CPU, disk, send alert via '$0 send-alert' command"
     echo "  init-monit-bkjs - setup monit to keep $BKJS service running without using any other services and monitor"
+    echo "  init-alerts - init alerts in the monit and other systems, use DB config for the specified app name"
     echo "  init-postfix - [-domain DOMAIN] install and configure postfix for the domain"
     echo "  init-dns - install and setup dnsmasq for local cahching DNS server"
     echo "  init-instancejob - configure for temporary job instance"
@@ -1348,6 +1415,9 @@ EOF
     echo "  init-redis-service [-memsize PERCENT] [-memmax SIZE] - setup Redis server to be run on start and to be monitored (Linux only)"
     echo "  run-redis [-memsize PERCENT] [-memmax SIZE] - run local Redis server, uses config file $REDIS_CONF"
     echo "  stop-redis - stop local Redis server"
+    echo "  init-sentinel-service [-host HOST] [-port PORT] - setup Redis Sentinel server to be run on start and to be monitored (Linux only)"
+    echo "  run-sentinel - run local Redis Sentinel server, uses config file $REDIS_PREFIX/sentinel.conf"
+    echo "  stop-sentinel - stop local Redis Sentinel server"
     echo "  init-dynamodb - download and install local DynamoDB, start the server"
     echo "  get-dynamodb - install local DynamoDB server in $BKJS_PREFIX/dynamodb"
     echo "  run-dynamodb - run local DynamoDB server installed in $BKJS_PREFIX/dynamodb, data files in $BKJS_HOME/var"
@@ -1376,7 +1446,7 @@ EOF
     echo "  show-help - show all backend command line and config parameters"
     echo ""
     echo "bksh commands:"
-    echo "if any of the commands below is specified it is exetued and then exit, otherwise bksh launches interactive shell"
+    echo "if any of the commands below is specified it is executed and then exit, otherwise bksh launches interactive shell"
     echo ""
     echo "  -show-info - show app and version information"
     echo "  -account-get ID|LOGIN ... - show accounts by id or login"
@@ -1386,8 +1456,8 @@ EOF
     echo "  -location-put [login LOGIN|id ID] latitude LAT longitude LON ... - update location for an account"
     echo "  -send-request -url URL [-id ID|-login LOGIN] param value param value ... - send API request to the server specified in the url as user specified by login or account id, resolving the user is done directly from the current db pool, param values should not be url-encoded"
     echo "  -log-watch - run logwatcher and exit, send emails in case any errors found"
-    echo "  -test-run -test-cmd CMD [-test-file FILE] - run a test command in the shell, autoload ./tests.js if exists, optinally can load other file with tests, all other test params will be used as well"
-    echo "  -db-get-config [-separator =] [-format text] [-run-mode MODE] [-app-name NAME] [name VALUE ...] - show all config parameters retrieved from the remote database bk_config table for the current environment, to simulate another environment pass the following arguments as name value pairs: network, subnet, ipaddr"
+    echo "  -test-run CMD [-test-file FILE] - run a test command in the shell, autoload ./tests/tests.js if exists, optinally can load other file with tests, all other test params will be used as well"
+    echo "  -db-get-config [-separator =] [-format text] [-run-mode MODE] [-app-name NAME] [name VALUE ...] - show all config parameters retrieved from the remote database bk_config table for the current environment, to simulate another environment pass the following arguments as name value pairs: role, network, region, zone, tag"
     echo "  -db-tables [-separator nl] - list all table names for the current db pool"
     echo "  -db-select -table TABLE [-separator !] [-format text] [name VALUE ...] - return all records from the table or only that match given column values, all supported by db.select options are supported by prefixing with underscore like _count 10, the format is the same as for API query parameters"
     echo "  -db-scan -table TABLE [name VALUE ...] - return all records from the table using scan operation, same arg as for db-select"
@@ -1424,6 +1494,7 @@ EOF
     echo "  -ssh opts - pass additional parameters to the ssh command"
     echo "  -rsync opts - pass additional parameters to the rsync command"
     echo "  -args opts - generic parameters used by any specific command"
+    echo "  -config params - if applicable retrieve the DB config for the given criteria, params are passed to the -db-get-config call"
     ;;
 esac
 
