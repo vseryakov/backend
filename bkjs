@@ -123,15 +123,16 @@ export BKJS_GET_CONFIG="$0 run-shell -log none -db-get-config -format args $@"
 [ "$BKJS_PREFIX" = "" ] && export BKJS_PREFIX=/usr/local
 [ "$BKJS_BACKUP" = "" ] && export BKJS_BACKUP=$BKJS_HOME/backup
 [ "$CASSANDRA_PREFIX" = "" ] && export CASSANDRA_PREFIX=$BKJS_PREFIX/cassandra
-[ "$CASSANDRA_DIR" = "" ] && export CASSANDRA_DIR=$BKJS_HOME/cassandra
+[ "$CASSANDRA_DIR" = "" ] && export CASSANDRA_DIR=$BKJS_HOME/var/cassandra
 [ "$PG_PREFIX" = "" ] && export PG_PREFIX=/usr
 [ "$PG_LIBDIR" = "" ] && export PG_LIBDIR=$PG_PREFIX/lib
-[ "$PG_DIR" = "" ] && export PG_DIR=$BKJS_HOME/postgres
-[ "$MYSQL_DIR" = "" ] && export MYSQL_DIR=$BKJS_HOME/mysql
+[ "$PG_DIR" = "" ] && export PG_DIR=$BKJS_HOME/var/postgres
+[ "$MYSQL_DIR" = "" ] && export MYSQL_DIR=$BKJS_HOME/var/mysql
 [ "$MYSQL_PREFIX" = "" ] && export MYSQL_PREFIX=/usr
 [ "$DYNAMODB_PREFIX" = "" ] && export DYNAMODB_PREFIX=$BKJS_PREFIX/dynamodb
 [ "$ELASTICSEARCH_PREFIX" = "" ] && export ELASTICSEARCH_PREFIX=$BKJS_PREFIX/elasticsearch
-[ "$MONGO_DIR" = "" ] && export MONGO_DIR=$BKJS_HOME/mongo
+[ "$ELASTICSEARCH_DIR" = "" ] && export ELASTICSEARCH_DIR=$BKJS_HOME/var/elasticsearch
+[ "$MONGO_DIR" = "" ] && export MONGO_DIR=$BKJS_HOME/var/mongo
 [ "$BKJS_IDLETIME" = "" ] && export BKJS_IDLETIME=900
 [ "$BKJS_UPTIME" = "" ] && export BKJS_UPTIME=43200
 [ "$REDIS_PREFIX" = "" ] && export REDIS_PREFIX=$BKJS_HOME
@@ -683,13 +684,12 @@ case "$ARG" in
     network=$(get_value "$info" network)
     major=$(get_value "$info" major)
     minor=$(get_value "$info" minor)
-    patch=$(get_value "$info" patch)
     tag=$(echo $(get_value "$info" tag)|awk -F- '{print $1}')
-    dirs=$BKJS_SYNC/$name/
-    dirs="$dirs $BKJS_SYNC/$mode/"
-    dirs="$dirs $BKJS_SYNC/$name/$major.$minor/"
-    [ "$network" != "" ] && dirs="$dirs $BKJS_SYNC/$network/"
-    [ "$tag" != "" -a "$tag" != "$name" ] && dirs="$dirs $BKJS_SYNC/$tag/"
+    dirs=$BKJS_SYNC/$mode/$name
+    dirs="$dirs $BKJS_SYNC/$mode/$name/$major.$minor/"
+    [ "$network" != "" ] && dirs="$dirs $BKJS_SYNC/$mode/$name/$network/"
+    [ "$tag" != "" -a "$tag" != "$name" ] && dirs="$dirs $BKJS_SYNC/$mode/$name/$tag/"
+    [ "$BKJS_DRY_RUN" != "" ] && $ECHO "INFO:\n$info\nDIRS:\n$dirs" && exit
     if [[ $BKJS_SYNC =~ ^s3:// ]]; then
        region=$(get_value "$info" region)
        for dir in $dirs; do echo aws s3 sync $dir $BKJS_HOME ${BKJS_DEBUG:--quiet} --recursive --region $region; done
@@ -733,7 +733,7 @@ case "$ARG" in
     for h in $BKJS_HOST; do
         echo "Deploying the module $mod: -e 'ssh $BKJS_SSH_ARGS' $BKJS_RSYNC_ARGS $(echo $files) $h:$BKJS_PATH"
         if [ "$BKJS_DRY_RUN" = "" ]; then
-           [ "$cleanup" != "" -a "$BKJS_PATH" != "" ] && ssh $BKJS_SSH_ARGS $h rm -f $BKJS_PATH/*
+           [ "$cleanup" != "" -a "$BKJS_PATH" != "" ] && ssh $BKJS_SSH_ARGS $h rm -rf $BKJS_PATH/*
            rsync -av $BKJS_DEBUG -e "ssh $BKJS_SSH_ARGS" $BKJS_RSYNC_ARGS $files $h:$BKJS_PATH
         fi
     done
@@ -816,8 +816,8 @@ case "$ARG" in
     if [ "$BACKUP_ARCHIVE_FILES" != "" ]; then
 
        # Send to remote host if configured, must be full ssh url with path like user@host:/path
-       if [ "$BACKUP_REMOTE" != "" ]; then
-          for h in $BACKUP_REMOTE; do
+       if [ "$BACKUP_HOST" != "" ]; then
+          for h in $BACKUP_HOST; do
             su - $BKJS_USER -c "scp -q $BACKUP_ARCHIVE_FILES $h"
           done
        fi
@@ -964,6 +964,7 @@ case "$ARG" in
     $ECHO "sentinel parallel-syncs $name 1" >> $conf
     $ECHO "dir $REDIS_PREFIX/var/" >> $conf
     $ECHO "pidfile $REDIS_PREFIX/var/sentinel.pid" >> $conf
+    chown $BKJS_USER $conf
 
     $ECHO "check process redis-sentinel with pidfile \"$REDIS_PREFIX/var/sentinel.pid\" start program = \"$0 run-sentinel $@\" as uid $BKJS_USER and gid $BKJS_GROUP stop program = \"$0 stop-sentinel\"" > /etc/monit.d/sentinel.conf
     monit reload
@@ -1028,13 +1029,13 @@ case "$ARG" in
 
   get-cassandra)
     if [ ! -d $CASSANDRA_PREFIX ]; then
-        mkdir -p $CASSANDRA_PREFIX $CASSANDRA_DIR/var $CASSANDRA_DIR/log
+        mkdir -p $CASSANDRA_PREFIX $CASSANDRA_DIR
         curl -OL http://downloads.datastax.com/community/dsc.tar.gz
         tar -C $CASSANDRA_PREFIX --strip-components=1 -xzf dsc.tar.gz
         rm -rf dsc.tar.gz
-        $SED "s|-Dcassandra.logdir=\$CASSANDRA_HOME/logs|-Dcassandra.logdir=$CASSANDRA_DIR/log|g" $CASSANDRA_PREFIX/bin/cassandra
-        $SED "s|/var/lib/cassandra/|$CASSANDRA_DIR/var/|g" $CASSANDRA_PREFIX/conf/*.{yaml,properties,sh}
-        $SED "s|/var/log/cassandra/|$CASSANDRA_DIR/log/|g" $CASSANDRA_PREFIX/conf/*.{yaml,properties,sh}
+        $SED "s|-Dcassandra.logdir=\$CASSANDRA_HOME/logs|-Dcassandra.logdir=$BKJS_HOME/log|g" $CASSANDRA_PREFIX/bin/cassandra
+        $SED "s|/var/lib/cassandra/|$CASSANDRA_DIR/|g" $CASSANDRA_PREFIX/conf/*.{yaml,properties,sh}
+        $SED "s|/var/log/cassandra/|$BKJS_HOME/log/|g" $CASSANDRA_PREFIX/conf/*.{yaml,properties,sh}
         $SED "s|# commitlog_directory:|commitlog_directory:|" $CASSANDRA_PREFIX/conf/cassandra.yaml
         $SED "s|# saved_caches_directory:|saved_caches_directory:|" $CASSANDRA_PREFIX/conf/cassandra.yaml
         $SED "s|# data_file_directories:|data_file_directories:|" $CASSANDRA_PREFIX/conf/cassandra.yaml
@@ -1068,6 +1069,8 @@ case "$ARG" in
         tar -C $ELASTICSEARCH_PREFIX --strip-components=1 -xzf es.tgz
         rm -rf es.tgz
         cd $ELASTICSEARCH_PREFIX
+        echo "path.data: $ELASTICSEARCH_DIR" >> config/elasticsearch.yml
+        echo "path.logs: $BKJS_HOME/log" >> config/elasticsearch.yml
         echo "script.inline: on" >> config/elasticsearch.yml
         echo "script.indexed: on" >> config/elasticsearch.yml
         if [ "$OS_TYPE" = "amazon" ]; then
@@ -1100,7 +1103,7 @@ case "$ARG" in
        export ES_MAX_MEM=$memmax
        $SED "s/ES_MAX_MEM=[0-9]+(g|m)?/ES_MAX_MEM=$memmax/" $ELASTICSEARCH_PREFIX/bin/elasticsearch.in.sh
     fi
-    $ELASTICSEARCH_PREFIX/bin/elasticsearch -Des.path.logs=$BKJS_HOME/log -p $BKJS_HOME/var/elasticsearch.pid -d >>$BKJS_HOME/log/message.log 2>&1
+    $ELASTICSEARCH_PREFIX/bin/elasticsearch -p $BKJS_HOME/var/elasticsearch.pid -d >>$BKJS_HOME/log/message.log 2>&1
     ;;
 
   stop-elasticsearch)
@@ -1488,7 +1491,7 @@ EOF
     echo "  -aws-replace-elb -elb-name NAME [-timeout MSECS] [-interval MSECS] [-dry-run]"
     echo "  -aws-setup-ssh -group-name NAME [-close] [-dry-run]"
     echo "  -aws-setup-instance [-cmd CMD] [-file FILE ] [-wait] [-dry-run]"
-    echo "  -aws-create-launch-config [-name NAME] [-config-name NAME] [-instance-name NAME] [-dry-run] - create or copy a launch configuration for autoscaling"
+    echo "  -aws-create-launch-config [-name NAME] [-config-name NAME] [-instance-name NAME] [-update-groups] [-dry-run] - create a launch configuration for autoscaling, can copy from an instance or other existing config, optinally update all ASGs with new config name"
     echo ""
     echo "Common options:"
     echo "  -root path - path to the backend home directory, default is $BKJS_HOME"
