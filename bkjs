@@ -362,6 +362,7 @@ case "$ARG" in
        echo '$ModLoad imudp' >> /etc/rsyslog.conf
        echo '$UDPServerAddress 127.0.0.1' >> /etc/rsyslog.conf
        echo '$UDPServerRun 514' >> /etc/rsyslog.conf
+       echo '$MaxMessageSize 64k' >> /etc/rsyslog.conf
        echo '$SystemLogRateLimitInterval 1' >> /etc/rsyslog.conf
        echo '$SystemLogRateLimitInterval 1' >> /etc/rsyslog.conf
        echo '$SystemLogRateLimitBurst 10000' >> /etc/rsyslog.conf
@@ -526,6 +527,29 @@ case "$ARG" in
     SERVICE=$(basename $BKJS_PATH | awk -F. '{print $1}')
     echo "Stopping service $SERVICE with $BKJS_PATH"
     chkconfig $SERVICE off
+    if [ -f /etc/monit.d/$SERVICE.conf ]; then
+       rm /etc/monit.d/$SERVICE.conf
+       monit reload
+    fi
+    $0 stop
+    ;;
+
+  init-mfa)
+    [ "$(whoami)" != "root" ] && echo "Run as root please" && exit 1
+    yum install google-authenticator –y
+    if [ "$(egrep -s 'pam_google_authenticator' /etc/pam.d/sshd)" = "" ]; then
+       sed -i -r 's|^auth[ \t]+substack[ \t]+password-auth|auth required pam_google_authenticator.so\n#auth substack password-auth|' /etc/pam.d/sshd
+    fi
+    if [ "$(egrep -s 'pam_google_authenticator' /etc/pam.d/system-auth)" = "" ]; then
+       sed -i -r 's|^auth[ \t]+sufficient[ \t]+pam_unix.so nullok try_first_pass|auth requisite pam_unix.so nullok try_first_pass\nauth sufficient pam_google_authenticator.so|' /etc/pam.d/system-auth
+    fi
+    if [ "$(egrep -s '^ChallengeResponseAuthentication yes' /etc/ssh/sshd_config)" = "" ]; then
+       echo 'ChallengeResponseAuthentication yes' >> /etc/ssh/sshd_config
+    fi
+    if [ "$(egrep -s '^AuthenticationMethods publickey,keyboard-interactive' /etc/ssh/sshd_config)" = "" ]; then
+       echo 'AuthenticationMethods publickey,keyboard-interactive' >> /etc/ssh/sshd_config
+    fi
+    su $(get_arg -user ec2-user) -c "google-authenticator -d -t -f -r 2 -m 30"
     ;;
 
   init-monit-system)
@@ -627,7 +651,7 @@ case "$ARG" in
     fi
     ;;
 
-  init-sendmail)
+  init-sendmail-ses)
     get_config user -user
     get_config host -host
     get_config password -password
@@ -669,6 +693,21 @@ case "$ARG" in
     egrep '^MAILER' /etc/mail/sendmail.mc >> $file
     m4 $file > /etc/mail/sendmail.cf
     service sendmail restart
+    ;;
+
+  init-sendmail-ses-relay)
+    off=$(get_flag -off)
+    if [ "$off" != "" ]; then
+       if [ "$(egrep -s -E "^DSemail-smtp" /etc/mail/sendmail.cf)" != "" ]; then
+          sed -i 's/^DSemail-smtp/#DSemail-smtp/' /etc/mail/sendmail.cf
+          service sendmail restart
+       fi
+    else
+       if [ "$(egrep -s -E "^DSemail-smtp" /etc/mail/sendmail.cf)" = "" ]; then
+          sed -r -i 's/^#+DSemail-smtp/DSemail-smtp/' /etc/mail/sendmail.cf
+          service sendmail restart
+       fi
+    fi
     ;;
 
   send-alert)
@@ -971,26 +1010,35 @@ case "$ARG" in
 
   get-redis)
     # Install redis server
-    sudo yum remove -y redis
-    sudo yum install -y jemalloc
+    case "$PLATFORM" in
+     Darwin)
+       OS=osx
+       ;;
+     Linux)
+       sudo yum remove -y redis
+       sudo yum install -y jemalloc
+       ;;
+    esac
 
-    ver=$(get_arg -version 3.0.7)
+    ver=$(get_arg -version 3.2.1)
     curl -L -o redis.tgz http://download.redis.io/releases/redis-$ver.tar.gz
 
     mkdir -p redis
     tar -C redis --strip-components=1 -xzf redis.tgz
     make -C redis install PREFIX=$REDIS_PREFIX
-    sed -r \
-        -e 's|^# syslog-enabled no|syslog-enabled yes|' \
-        -e "s|^dir ./|dir $REDIS_PREFIX/var/|" \
-        -e "s|^timeout 0|timeout 3600|" \
-        -e "s|^pidfile /var/run/redis.pid|pidfile $REDIS_PREFIX/var/redis.pid|" \
-        -e "s|^logfile \"\"|logfile $REDIS_PREFIX/log/redis.log|" \
-        -e "s|^tcp-keepalive .+|tcp-keepalive 60|" \
-        -e "s|^maxmemory-policy .+|maxmemory-policy volatile-lru|" \
-        -e "s|^# maxmemory-policy .+|maxmemory-policy volatile-lru|" \
-        -e 's|^daemonize no|daemonize yes|' redis/redis.conf > $REDIS_PREFIX/etc/redis.conf
+    cp redis/redis.conf $BKJS_HOME/etc
     rm -rf redis redis.tgz
+    $SED -e 's|^# syslog-enabled no|syslog-enabled yes|' \
+         -e "s|^dir ./|dir $BKJS_HOME/var/|" \
+         -e "s|^timeout 0|timeout 3600|" \
+         -e "s|^bind|# bind|" \
+         -e "s|^pidfile /var/run/redis.pid|pidfile $BKJS_HOME/var/redis.pid|" \
+         -e "s|^logfile \"\"|logfile $BKJS_HOME/log/redis.log|" \
+         -e "s|^tcp-keepalive .+|tcp-keepalive 60|" \
+         -e "s|^maxmemory-policy .+|maxmemory-policy volatile-lru|" \
+         -e "s|^# maxmemory-policy .+|maxmemory-policy volatile-lru|" \
+         -e 's|^daemonize no|daemonize yes|' \
+         $BKJS_HOME/etc/redis.conf
     ;;
 
   init-redis-service)
@@ -1004,8 +1052,8 @@ case "$ARG" in
     if [ "$(grep -s 'transparent_hugepage' /etc/rc.local)" = "" ]; then
        echo 'echo never > /sys/kernel/mm/transparent_hugepage/enabled' >> /etc/rc.local
     fi
-    $ECHO "$REDIS_PREFIX/log/redis.log {\n  weekly\n  rotate 10\n  copytruncate\n  delaycompress\n  compress\n  notifempty\n  missingok\n}" > /etc/logrotate.d/redis
-    $ECHO "check process redis-server with pidfile \"$REDIS_PREFIX/var/redis.pid\" start program = \"$0 run-redis $@\" as uid $BKJS_USER and gid $BKJS_GROUP stop program = \"$0 stop-redis\"" > /etc/monit.d/redis.conf
+    $ECHO "$BKJS_HOME/log/redis.log {\n  weekly\n  rotate 10\n  copytruncate\n  delaycompress\n  compress\n  notifempty\n  missingok\n}" > /etc/logrotate.d/redis
+    $ECHO "check process redis-server with pidfile \"$BKJS_HOME/var/redis.pid\" start program = \"$0 run-redis $@\" as uid $BKJS_USER and gid $BKJS_GROUP stop program = \"$0 stop-redis\"" > /etc/monit.d/redis.conf
     monit reload
     ;;
 
@@ -1015,9 +1063,9 @@ case "$ARG" in
     [ "$memsize" != "" ] && memmax="$(( ($(free -m|grep Mem:|awk '{print $2}') * $memsize) / 100 ))mb"
     memmax=$(get_arg -memmax $memmax)
     if [ "$memmax" != "" ]; then
-       sed -r -i -e "s|^maxmemory .+|maxmemory $memmax|" -e "s|^# maxmemory .+|maxmemory $memmax|" $REDIS_PREFIX/etc/redis.conf
+       sed -r -i -e "s|^maxmemory .+|maxmemory $memmax|" -e "s|^# maxmemory .+|maxmemory $memmax|" $BKJS_HOME/etc/redis.conf
     fi
-    $REDIS_PREFIX/bin/redis-server $REDIS_PREFIX/etc/redis.conf
+    $REDIS_PREFIX/bin/redis-server $BKJS_HOME/etc/redis.conf
     ;;
 
   stop-redis)
@@ -1144,10 +1192,12 @@ case "$ARG" in
   [ "$(get_arg -force)" != "" -a "$ELASTICSEARCH_PREFIX" != "" ] && rm -rf $ELASTICSEARCH_PREFIX
     if [ ! -d $ELASTICSEARCH_PREFIX ]; then
         mkdir -p $ELASTICSEARCH_PREFIX
-        curl -L -o es.tgz https://download.elasticsearch.org/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.3/elasticsearch-2.3.3.tar.gz
+        curl -L -o es.tgz https://download.elasticsearch.org/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.5/elasticsearch-2.3.5.tar.gz
         tar -C $ELASTICSEARCH_PREFIX --strip-components=1 -xzf es.tgz
         rm -rf es.tgz
         cd $ELASTICSEARCH_PREFIX
+        echo "node.master: true" >> config/elasticsearch.yml
+        echo "node.data: true" >> config/elasticsearch.yml
         echo "path.data: $ELASTICSEARCH_DIR" >> config/elasticsearch.yml
         echo "path.logs: $BKJS_HOME/log" >> config/elasticsearch.yml
         echo "script.inline: on" >> config/elasticsearch.yml
@@ -1182,6 +1232,20 @@ case "$ARG" in
        export ES_MAX_MEM=$memmax
        $SED "s/ES_MAX_MEM=[0-9]+(g|m)?/ES_MAX_MEM=$memmax/" $ELASTICSEARCH_PREFIX/bin/elasticsearch.in.sh
     fi
+    case "$(get_arg -nodetype)" in
+    node)
+      $SED -e "s/^node.master.+/node.master: true/" -e "s/^node.data.+/node.data: true/" $ELASTICSEARCH_PREFIX/config/elasticsearch.yml
+      ;;
+    master)
+      $SED -e "s/^node.master.+/node.master: true/" -e "s/^node.data.+/node.data: false/" $ELASTICSEARCH_PREFIX/config/elasticsearch.yml
+      ;;
+    data)
+      $SED -e "s/^node.master.+/node.master: false/" -e "s/^node.data.+/node.data: true/" $ELASTICSEARCH_PREFIX/config/elasticsearch.yml
+      ;;
+    client)
+      $SED -e "s/^node.master.+/node.master: false/" -e "s/^node.data.+/node.data: false/" $ELASTICSEARCH_PREFIX/config/elasticsearch.yml
+      ;;
+    esac
     $ELASTICSEARCH_PREFIX/bin/elasticsearch -p $BKJS_HOME/var/elasticsearch.pid -d >>$BKJS_HOME/log/message.log 2>&1
     ;;
 
@@ -1248,7 +1312,9 @@ case "$ARG" in
     [ "$name" = "" ] && echo "-name is required" && exit 1
     user=$(get_arg -user ec2-user)
     region=$(get_arg -region)
-    cmd=$($0 show-instances -region "$region" -name "$name"|awk "{printf \"ssh -i ~/.ssh/\%s.pem -l $user %s\n\",\$4,\$3}"|head -1)
+    index=$(get_arg -index 1)
+    [ "$(get_flag -ip)" != "" ] && host=ip
+    cmd=$($0 show-instances -region "$region" -fmt "${host:-host},key" -name "$name"|awk "{printf \"ssh -i ~/.ssh/%s.pem -l $user %s\n\",\$2,\$1}"|head -$index|tail -1)
     [ "$cmd" = "" ] && exit 1
     [ "$BKJS_DEBUG" != "" ] && echo $cmd
     eval $cmd
@@ -1261,8 +1327,9 @@ case "$ARG" in
   npm-deps)
     args=$(get_arg -args)
     type=$(get_arg -type dependencies)
-    modules=$($NODE_BIN -e "try{console.log(Object.keys(JSON.parse(require('fs').readFileSync('package.json')).$type).join(' '))}catch(e){}" | sed "s/$BKJS_MOD//g")
-    echo $modules
+    skip=$(get_arg -skip $BKJS_MOD)
+    modules=$($NODE_BIN -e "try{skip='$skip'.split(/[ ,]/);console.log(Object.keys(JSON.parse(require('fs').readFileSync('package.json')).$type).filter(function(x){return skip.indexOf(x)==-1}).join(' '))}catch(e){}")
+    echo "$modules"
     sleep 1
     for m in $modules; do $NPM_BIN $args install $m; done
     ;;
@@ -1506,6 +1573,7 @@ EOF
     echo "  init-packages - install required packges and updates"
     echo "  init-devel - install development packages for node and modules compiclation"
     echo "  init-home - setup backend home with required folders"
+    echo "  init-mfa [-user ec2-user] - initialize EC2 instance with multi-factor authentication using Google authenticator"
     echo "  init-logwatcher - creates a crontab file in /etc/cron.d to periodically run the log watcher, -cron can specify full cron time spec"
     echo "  init-app - create application skeleton for an application based on the backend, app name can be specified as the first argument"
     echo "  send-alert [-event EVENT] [-descr DESCR] - send alert message to the error log and SNS topic if configured in \$BKJS_SNS variable, if called from monit event/descr will be provided"
@@ -1541,8 +1609,8 @@ EOF
     echo "  stop-cassandra - stop local Cassandra server"
     echo "  get-elasticsearch - install local ElasticSearch server in $BKJS_PREFIX/elasticsearch"
     echo "  init-elasticsearch - download and install local ElasticSearch, start the server, configure monit"
-    echo "  init-elasticsearch-service [-memsize PERCENT] [-memmax SIZE] - setup monit to keep elasticsearch service running"
-    echo "  run-elasticsearch [-memsize PERCENT] [-memmax SIZE] - run local ElasticSearch server installed in $BKJS_PREFIX/elasticsearch, -memmax is max heap size, -memsize is the percent of the total memory to use"
+    echo "  init-elasticsearch-service [-memsize PERCENT] [-memmax SIZE] [-nodetype TYPE] - setup monit to keep elasticsearch service running"
+    echo "  run-elasticsearch [-memsize PERCENT] [-memmax SIZE] [-nodetype TYPE] - run local ElasticSearch server installed in $BKJS_PREFIX/elasticsearch, -memmax is max heap size, -memsize is the percent of the total memory to use, -nodetype can be node,master,data,client"
     echo "  stop-elasticsearch - stop local ElasticSearch server"
     echo "  upgrade-elasticsearch - update with a new version and restart"
     echo "  init-mysql [-db DB] - setup MySQL server for development and create initial database, start the server"
@@ -1557,7 +1625,7 @@ EOF
     echo "  build-bkjs - clone and build the $BKJS_MOD from the git in the current dir with dependencies specified in -args"
     echo "  build-node - build node and install in $BKJS_PREFIX or in [-prefix PATH], on Linux init-devel should be called before this command to install devel packages"
     echo "  show-instances [-region region] [-name name] [-fmt fmt]- show running instances in region, optional tag pattern can be used for filter, FMT may contain: id,ip,host,key,name which will be replaced with actual values"
-    echo "  ec2-ssh -name name [-region region] - login using ssh to a host by tag name, key name will be used to specify a keypair from ~/.ssh/"
+    echo "  ec2-ssh -name name [-region region] [-ip] - login using ssh to a host(IP) by tag name, key name will be used to specify a keypair from ~/.ssh/"
     echo "  show-help - show all backend command line and config parameters"
     echo ""
     echo "bksh commands:"
@@ -1599,6 +1667,7 @@ EOF
     echo "  -aws-setup-ssh -group-name NAME [-close] [-dry-run]"
     echo "  -aws-setup-instance [-cmd CMD] [-file FILE ] [-wait] [-dry-run]"
     echo "  -aws-create-launch-config [-name NAME] [-config-name NAME] [-instance-name NAME] [-update-groups] [-dry-run] - create a launch configuration for autoscaling, can copy from an instance or other existing config, optinally update all ASGs with new config name"
+    echo "  -aws-set-route53 -name HOSTNAME [-filter PATTERN] [-type A|CNAME] [-ttl N] [-public] [-dry-run] - create or update a Route53 record of specified type with IP/hostnames of all instances that satisfy the given filter, -public makes it use public IP/hostnames"
     echo ""
     echo "Common options:"
     echo "  -root path - path to the backend home directory, default is $BKJS_HOME"
