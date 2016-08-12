@@ -276,6 +276,7 @@ case "$ARG" in
        echo "Configuring .bashrc..."
        echo '#Bkjs' >> $LHOME/.bashrc
        echo "umask 022" >> $LHOME/.bashrc
+       echo "BKJS_HOME=$BKJS_HOME" >> $LHOME/.bashrc
        echo "export PATH=\$PATH:$LHOME/bin:$LHOME/node_modules/.bin" >> $LHOME/.bashrc
        echo 'alias slog="tail -100 /var/log/messages"' >> $LHOME/.bashrc
        echo "alias mlog=\"tail -100 $BKJS_HOME/log/message.log\"" >> $LHOME/.bashrc
@@ -450,6 +451,7 @@ case "$ARG" in
        echo 'net.ipv4.tcp_synack_retries=2' >> /etc/sysctl.conf
        echo 'net.ipv4.tcp_rmem=8192 256000 8388608' >> /etc/sysctl.conf
        echo 'net.ipv4.tcp_wmem=4096 256000 8388608' >> /etc/sysctl.conf
+       echo 'net.ipv4.tcp_challenge_ack_limit = 999999999' >> /etc/sysctl.conf
        sysctl -p /etc/sysctl.conf
     fi
     ;;
@@ -828,7 +830,7 @@ case "$ARG" in
     [ "$BKJS_USER" != "$(whoami)" ] && BKJS_SSH_ARGS="$BKJS_SSH_ARGS -l $BKJS_USER"
     cleanup=$(get_flag -cleanup)
     key=$(get_arg -ssh-key)
-    [ "$key" != "" ] && BKJS_SSH_ARGS="$BKJS_SSH_ARGS -i $HOME/.ssh/$key.pem"
+    [ "$key" != "" -a -f $HOME/.ssh/$key.pem ] && BKJS_SSH_ARGS="$BKJS_SSH_ARGS -i $HOME/.ssh/$key.pem"
     files=$(get_arg -files)
     [ "$files" = "" ] && files=$(ls)
     for h in $BKJS_HOST; do
@@ -1023,7 +1025,7 @@ case "$ARG" in
     ver=$(get_arg -version 3.2.1)
     curl -L -o redis.tgz http://download.redis.io/releases/redis-$ver.tar.gz
 
-    mkdir -p redis
+    mkdir -p redis $BKJS_HOME/etc
     tar -C redis --strip-components=1 -xzf redis.tgz
     make -C redis install PREFIX=$REDIS_PREFIX
     cp redis/redis.conf $BKJS_HOME/etc
@@ -1144,7 +1146,7 @@ case "$ARG" in
 
   run-dynamodb)
     mkdir -p $BKJS_HOME/var $BKJS_HOME/log
-    params="-Xmx$(get_arg -xmx 320M)"
+    params="-Xmx$(get_arg -xmx 512M)"
     exec nohup java $params -Djava.library.path=$DYNAMODB_PREFIX/DynamoDBLocal_lib -jar $DYNAMODB_PREFIX/DynamoDBLocal.jar -dbPath $BKJS_HOME/var -port 8181 >>$BKJS_HOME/log/message.log 2>&1 &
     ;;
 
@@ -1300,6 +1302,10 @@ case "$ARG" in
     instances=$(aws ec2 describe-instances $region --filter "Name=instance-state-name,Values=running" $tags --query 'Reservations[*].Instances[*].[InstanceId,PrivateIpAddress,PublicIpAddress,KeyName,Tags[?Key==`Name`]]' --output text|awk '{if($4=="None")print $0;else if($1=="Name")print $2;else printf "%s ",$0;}')
     fmt=$(get_arg -fmt)
     [ "$fmt" != "" ] && instances=$(echo "$instances"|awk "{print $(echo $fmt|sed -e 's/id/\$1/' -e 's/ip/\$2/' -e 's/host/\$3/' -e 's/key/\$4/' -e 's/name/\$5/')}")
+    if [ "$PLATFORM" = "Linux" -a "$(get_flag -nomyip)" != "" ]; then
+       ip=$(ifconfig eth0|grep 'inet '|sed 's/addr://'|awk '{print $2}')
+       instances=$(echo $instances|sed "s/$ip//")
+    fi
     if [ "$(get_flag -line)" != "" ]; then
        echo "$instances" | tr '\n' ' '
     else
@@ -1314,8 +1320,13 @@ case "$ARG" in
     region=$(get_arg -region)
     index=$(get_arg -index 1)
     [ "$(get_flag -ip)" != "" ] && host=ip
-    cmd=$($0 show-instances -region "$region" -fmt "${host:-host},key" -name "$name"|awk "{printf \"ssh -i ~/.ssh/%s.pem -l $user %s\n\",\$2,\$1}"|head -$index|tail -1)
-    [ "$cmd" = "" ] && exit 1
+    instance=$($0 show-instances -region "$region" -fmt "${host:-host},key" -name "$name"|head -$index|tail -1)
+    [ "$instance" = "" ] && exit 1
+    host=$(echo $instance|awk '{print $1}')
+    key=$(echo $instance|awk '{print $2}')
+    cmd="ssh -l $user"
+    [ -f "~/.ssh/$key.pem" ] && cmd="$cmd -i ~/.ssh/$key.pem"
+    cmd="$cmd $host $(get_arg -cmd)"
     [ "$BKJS_DEBUG" != "" ] && echo $cmd
     eval $cmd
     ;;
@@ -1625,7 +1636,7 @@ EOF
     echo "  build-bkjs - clone and build the $BKJS_MOD from the git in the current dir with dependencies specified in -args"
     echo "  build-node - build node and install in $BKJS_PREFIX or in [-prefix PATH], on Linux init-devel should be called before this command to install devel packages"
     echo "  show-instances [-region region] [-name name] [-fmt fmt]- show running instances in region, optional tag pattern can be used for filter, FMT may contain: id,ip,host,key,name which will be replaced with actual values"
-    echo "  ec2-ssh -name name [-region region] [-ip] - login using ssh to a host(IP) by tag name, key name will be used to specify a keypair from ~/.ssh/"
+    echo "  ec2-ssh -name name [-region region] [-ip] [-cmd cmd] - login using ssh to a host(IP) by tag name, key name will be used to specify a keypair from ~/.ssh/, -cmd if specified will be run on the remote host"
     echo "  show-help - show all backend command line and config parameters"
     echo ""
     echo "bksh commands:"
