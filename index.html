@@ -45,41 +45,48 @@
     <div id="content" class="content">
      <h2>Backend platform for node.js</h2>
 
-     <p>
-     General purpose backend framework. The primary goal is to have a scalable platform for running and managing node.js
-     servers for Web services implementation.
-     </p>
-
-     Features:
-     <ul>
-<li>Exposes a set of Web service APIs over HTTP(S) using Express framework.</li>
+<p>General purpose backend framework. The primary goal is to have a scalable platform for running and managing node.js
+servers for Web services implementation.
+</p>
+<p>
+This framework only covers the lower portion of the Web services system:
+node.js processes, HTTP servers, basic API functinality, database access, caching, messaging between processes,
+metrics and monitoring, a library of tools for developing node.js servers.
+</p>
+<p>
+For the UI and presentation layer there are no restrictions what to use as long as it can run on top of the Express server.
+</p>
+Features:
+<ul>
+<li>Exposes a set of Web service APIs over HTTP(S) using Express framework.
 <li>Database API supports Sqlite, PostgreSQL, MySQL, DynamoDB, Cassandra, MongoDB, Redis with all basic operations behaving the
-same way allowing to switch databases without changing the code.</li>
-<li>Database driver for LevelDB, LMDB, CouchDB, Riak, ElasticSearch support only a subset of all database operations</li>
-<li>Easily extendable to support any kind of database, provides a database driver on top of Redis with all supported methods.</li>
-<li>Provides accounts, connections, locations, messaging and icons APIs with basic functionality for a qucik start.</li>
-<li>Supports crontab and queue job processing by seperate workers.</li>
-<li>Authentication is based on signed requests using API key and secret, similar to Amazon AWS signing requests.</li>
-<li>Runs web server as separate processes to utilize multiple CPU cores.</li>
-<li>Supports WebSockets connections and process them with the same Express routes as HTTP requests</li>
-<li>Supports several cache modes(Redis, memcached, LRU) for the database operations.</li>
-<li>Supports several PUB/SUB modes of operations using Redis, RabbitMQ.</li>
-<li>Supports jobs processing using several work queue implementations on top of RabbitMQ, Redis, DB</li>
-<li>Supports common database operations (Get, Put, Del, Update, Select) for all databases using the same DB API.</li>
-<li>ImageMagick is compiled as C++ module for in-process image scaling.</li>
-<li>REPL(command line) interface for debugging and looking into server internals.</li>
-<li>Geohash based location searches supported by all databases drivers.</li>
-<li>Supports push notifications for mobile devices, APN and GCM</li>
+  same way allowing to switch databases without changing the code.
+<li>Database drivers for LevelDB, LMDB, CouchDB, Riak, ElasticSearch support only a subset of all database operations
+<li>Easily extendable to support any kind of database, provides a database driver on top of Redis with all supported methods.
+<li>Provides accounts, connections, locations, messaging and icons APIs with basic functionality for a qucik start.
+<li>Supports crontab and queue job processing by seperate workers.
+<li>Authentication is based on signed requests using API key and secret, similar to Amazon AWS signing requests.
+<li>Runs web server as separate processes to utilize multiple CPU cores.
+<li>Supports WebSockets connections and process them with the same Express routes as HTTP requests
+<li>Supports several cache modes(Redis, Memcache, Hazelcast, LRU) for the database operations, multiple hosts support
+  in the clients for failover.
+<li>Supports several PUB/SUB modes of operations using Redis, RabbitMQ, Hazelcast.
+<li>Supports async jobs processing using several work queue implementations on top of SQS, Redis, DB, RabbitMQ, Hazelcast.
+<li>Supports common database operations (Get, Put, Del, Update, Select) for all databases using the same DB API.
+<li>ImageMagick is compiled as C++ module for in-process image scaling.
+<li>REPL(command line) interface for debugging and looking into server internals.
+<li>Geohash based location searches supported by all databases drivers.
+<li>Supports push notifications for mobile devices, APN and GCM/FCM.
 <li>Supports HTTP(S) reverse proxy mode where multiple Web workers are load-balanced by the proxy
-server running in the master process instead of relying on the OS scheduling between processes listening on the same port.</li>
-<li>AWS supports is very well integrated including EC2, S3, DynamoDB, SQS and more.</li>
-<li>Includes simple log watcher to monitor the log files including system errors.</li>
-<li>Can be used with any MVC, MVVC or other types of frameworks that work on top or with the Express server.</li>
-<li>Intergated very light unit testing facility which can be used to test modules and API requests</li>
-<li>Support runtime metrics about the timing on database, requests, cache, memory and request rate limit control</li>
-<li>Hosted on <a href="https://github.com/vseryakov/backendjs">github</a>, BSD licensed.</li>
-    </ul>
-    </div>
+  server running in the master process instead of relying on the OS scheduling between processes listening on the same port.
+<li>Can be used with any MVC, MVVC or other types of frameworks that work on top or with the Express server.
+<li>AWS supports is very well integrated including EC2, S3, DynamoDB, SQS and more.
+<li>Includes simple log watcher to monitor the log files including system errors.
+<li>Supports i18n hooks for request/response objects, easily overriden with any real i18n implementation.
+<li>Integrated very light unit testing facility which can be used to test modules and API requests
+<li>Support runtime metrics about the timing on database, requests, cache, memory and request rate limit control
+<li>Hosted on [github](https://github.com/vseryakov/backendjs), BSD licensed.
+</ul>
 
     <footer class="footer">
       <div class="container small">
