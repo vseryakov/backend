@@ -199,7 +199,7 @@ case "$ARG" in
     $0 init-devel "$@"
     [ "$(which node 2>/dev/null)" = "" ] && (cd $BKJS_HOME && sudo -H -u $BKJS_USER $0 build-node -prefix $BKJS_PREFIX)
     (cd $BKJS_HOME && sudo -H -u $BKJS_USER $0 install-bkjs -args $BKJS_ARGS)
-    (cd $BKJS_HOME/bin && ln -sf ../node_modules/$BKJS_MOD/bkjs && ln -sf ../node_modules/$BKJS_MOD/bkjs bksh)
+    (cd $BKJS_HOME/bin && ln -sf ../node_modules/$BKJS_MOD/bkjs && ln -sf bkjs bksh)
     chown -R $BKJS_USER $BKJS_HOME
     ;;
 
@@ -414,7 +414,7 @@ case "$ARG" in
 
     # Make sure monit is running all the time
     echo "set logfile syslog" > /etc/monit.d/logging
-    sed -i 's|daemon $prog|daemon $prog\n\t[ "$(whoami)" = "root" ] \&\& ulimit -n 512000|' /etc/init.d/monit
+    sed -i 's|daemon $prog|ulimit -n 512000\n\tdaemon $prog|' /etc/init.d/monit
     chkconfig monit on
     service monit restart
 
@@ -560,12 +560,14 @@ case "$ARG" in
        sed -i -r 's|^auth[ \t]+sufficient[ \t]+pam_unix.so nullok try_first_pass|auth requisite pam_unix.so nullok try_first_pass\nauth sufficient pam_google_authenticator.so|' /etc/pam.d/system-auth
     fi
     if [ "$(egrep -s '^ChallengeResponseAuthentication yes' /etc/ssh/sshd_config)" = "" ]; then
+       sed -i -r 's|^ChallengeResponseAuthentication|#ChallengeResponseAuthentication' /etc/ssh/sshd_config
        echo 'ChallengeResponseAuthentication yes' >> /etc/ssh/sshd_config
     fi
     if [ "$(egrep -s '^AuthenticationMethods publickey,keyboard-interactive' /etc/ssh/sshd_config)" = "" ]; then
+       sed -i -r 's|^AuthenticationMethods|#AuthenticationMethods' /etc/ssh/sshd_config
        echo 'AuthenticationMethods publickey,keyboard-interactive' >> /etc/ssh/sshd_config
     fi
-    su $(get_arg -user ec2-user) -c "google-authenticator -d -t -f -r 2 -m 30"
+    su $(get_arg -user ec2-user) -c "google-authenticator -d -t -f -r 2 -R 30"
     ;;
 
   init-monit-system)
@@ -771,6 +773,7 @@ case "$ARG" in
     # Setup domain from the config, keep the hostname as it is, for EC2 instances it is the IP address
     [ "$BKJS_DOMAIN" != "" ] && $0 init-hostname -domain $BKJS_DOMAIN
     [ "$OS_TYPE" = "amazon" ] && aws configure set region $(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone/|sed 's/[a-z]$//')
+    [ -f $BKJS_HOME/var/bkjs.init ] && rm -rf $BKJS_HOME/var/* $BKJS_HOME/log/*
     $0 init-alerts
     $0 run-sync
     ;;
@@ -1021,7 +1024,7 @@ case "$ARG" in
        ;;
     esac
 
-    ver=$(get_arg -version 3.2.7)
+    ver=$(get_arg -version 3.2.8)
     curl -L -o redis.tgz http://download.redis.io/releases/redis-$ver.tar.gz
 
     mkdir -p redis $BKJS_HOME/etc
@@ -1033,6 +1036,7 @@ case "$ARG" in
          -e "s|^dir ./|dir $BKJS_HOME/var/|" \
          -e "s|^timeout 0|timeout 3600|" \
          -e "s|^bind|# bind|" \
+         -e "s|^protected-mode yes|protected-mode no|" \
          -e "s|^pidfile /var/run/redis.+|pidfile $BKJS_HOME/var/redis.pid|" \
          -e "s|^logfile \"\"|logfile $BKJS_HOME/log/redis.log|" \
          -e "s|^tcp-keepalive .+|tcp-keepalive 60|" \
@@ -1168,7 +1172,7 @@ case "$ARG" in
     [ "$(get_flag -force)" != "" -a "$HAZELCAST_PREFIX" != "" ] && rm -rf $HAZELCAST_PREFIX
     if [ ! -d $HAZELCAST_PREFIX ]; then
        mkdir -p $HAZELCAST_PREFIX
-       curl -L -o hc.tar 'http://download.hazelcast.com/download.jsp?version=hazelcast-3.7.4&type=tar&p=224475444'
+       curl -L -o hc.tar 'http://download.hazelcast.com/download.jsp?version=hazelcast-3.8&type=tar&p=224475444'
        tar -C $HAZELCAST_PREFIX --strip-components=1 -xf hc.tar
        rm -rf hc.tar
     fi
@@ -1243,7 +1247,7 @@ case "$ARG" in
     [ "$(get_flag -force)" != "" -a "$ELASTICSEARCH_PREFIX" != "" ] && rm -rf $ELASTICSEARCH_PREFIX
     if [ ! -d $ELASTICSEARCH_PREFIX ]; then
         mkdir -p $ELASTICSEARCH_PREFIX
-        curl -L -o es.tgz https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-5.2.0.tar.gz
+        curl -L -o es.tgz https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-5.2.2.tar.gz
         tar -C $ELASTICSEARCH_PREFIX --strip-components=1 -xzf es.tgz
         rm -rf es.tgz
         cd $ELASTICSEARCH_PREFIX
@@ -1285,8 +1289,8 @@ case "$ARG" in
     [ "$memsize" != "" ] && memmax="$(( ($(free -m|grep Mem:|awk '{print $2}') * $memsize) / 100 ))m"
     memmax=$(get_arg -memmax $memmax)
     if [ "$memmax" != "" ]; then
-       export ES_MAX_MEM=$memmax
-       $SED "s/ES_MAX_MEM=[0-9]+(g|m)?/ES_MAX_MEM=$memmax/" $ELASTICSEARCH_PREFIX/bin/elasticsearch.in.sh
+       $SED "s/^-Xms.+/-Xms$memmax/" $ELASTICSEARCH_PREFIX/config/jvm.options
+       $SED "s/^-Xmx.+/-Xmx$memmax/" $ELASTICSEARCH_PREFIX/config/jvm.options
     fi
     case "$(get_arg -nodetype)" in
     node)
