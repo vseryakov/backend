@@ -8,8 +8,7 @@ pages:
 
 update:
 	cd ../backendjs && npm run doc
-	cp ../backendjs/bkjs ../backendjs/web/doc.html .
+	cp ../backendjs/web/doc.html .
 	git commit -a -m docs && git push
-	cp bkjs site/
 	cd site && git commit -a -m updates && git push
 
