@@ -58,33 +58,33 @@ For the UI and presentation layer there are no restrictions what to use as long 
 </p>
 Features:
 <ul>
-<li>Exposes a set of Web service APIs over HTTP(S) using Express framework.
-<li>Database API supports Sqlite, PostgreSQL, MySQL, DynamoDB, Cassandra, MongoDB, Redis with all basic operations behaving the
-  same way allowing to switch databases without changing the code.
-<li>Database drivers for LevelDB, LMDB, CouchDB, Riak, ElasticSearch support only a subset of all database operations
-<li>Easily extendable to support any kind of database, provides a database driver on top of Redis with all supported methods.
-<li>Provides accounts, connections, locations, messaging and icons APIs with basic functionality for a qucik start.
-<li>Supports crontab and queue job processing by seperate workers.
-<li>Authentication is based on signed requests using API key and secret, similar to Amazon AWS signing requests.
-<li>Runs web server as separate processes to utilize multiple CPU cores.
-<li>Supports WebSockets connections and process them with the same Express routes as HTTP requests
-<li>Supports several cache modes(Redis, Memcache, Hazelcast, LRU) for the database operations, multiple hosts support
+<li> Exposes a set of Web service APIs over HTTP(S) using Express framework.
+<li> Database API supports SQLite, DynamoDB, ElasticSearch with all basic operations behaving the
+  same way allowing you to switch databases without changing the code.
+<li> Database operations (Get, Put, Del, Update, Select) for all supported databases using the same DB API.
+<li> Experimental database drivers for PostreSQL, MySQL, Cassandra, Riak, CouchDB
+<li> Experimental DynamoDB Streams processing in background worker processes
+<li> Easily extensible to support any kind of database, provides a database driver on top of Redis with all supported methods as an example.
+<li> Provides accounts, connections, locations, messaging and icons APIs with basic functionality for a quick start.
+<li> Supports crontab and queue job processing by separate worker processes.
+<li> Authentication is based on signed requests using API key and secret, similar to Amazon AWS signing requests.
+<li> Runs web server as separate processes to utilize multiple CPU cores.
+<li> Supports WebSockets connections and process them with the same Express routes as HTTP requests
+<li> Supports several cache modes(Redis, Memcache, Hazelcast, LRU) for the database operations, multiple hosts support
   in the clients for failover.
-<li>Supports several PUB/SUB modes of operations using Redis, RabbitMQ, Hazelcast.
-<li>Supports async jobs processing using several work queue implementations on top of SQS, Redis, DB, RabbitMQ, Hazelcast.
-<li>Supports common database operations (Get, Put, Del, Update, Select) for all databases using the same DB API.
-<li>ImageMagick is compiled as C++ module for in-process image scaling.
-<li>REPL(command line) interface for debugging and looking into server internals.
-<li>Geohash based location searches supported by all databases drivers.
-<li>Supports push notifications for mobile devices, APN and GCM/FCM.
-<li>Supports HTTP(S) reverse proxy mode where multiple Web workers are load-balanced by the proxy
+<li> Supports several PUB/SUB modes of operations using Redis, RabbitMQ, Hazelcast.
+<li> Supports async jobs processing using several work queue implementations on top of SQS, Redis, DB, RabbitMQ, Hazelcast.
+<li> ImageMagick as a separate C++ module for in-process image scaling, see bkjs-wand on NPM.
+<li> REPL (command line) interface for debugging and looking into server internals.
+<li> Supports push notifications for mobile devices, APN and GCM/FCM.
+<li> Supports HTTP(S) reverse proxy mode where multiple Web workers are load-balanced by the proxy
   server running in the master process instead of relying on the OS scheduling between processes listening on the same port.
-<li>Can be used with any MVC, MVVC or other types of frameworks that work on top or with the Express server.
-<li>AWS supports is very well integrated including EC2, S3, DynamoDB, SQS and more.
-<li>Includes simple log watcher to monitor the log files including system errors.
-<li>Supports i18n hooks for request/response objects, easily overriden with any real i18n implementation.
-<li>Integrated very light unit testing facility which can be used to test modules and API requests
-<li>Support runtime metrics about the timing on database, requests, cache, memory and request rate limit control
+<li> Can be used with any MVC, MVVC or other types of frameworks that work on top of, or with, the Express server.
+<li> AWS support is very well integrated including EC2, S3, DynamoDB, SQS and more.
+<li> Includes simple log watcher to monitor the log files including system errors.
+<li> Supports i18n hooks for request/response objects, easily overriden with any real i18n implementation.
+<li> Integrated very light unit testing facility which can be used to test modules and API requests
+<li> Supports runtime metrics about the timing on database, requests, cache, memory and request rate limit control
 <li>Hosted on [github](https://github.com/vseryakov/backendjs), BSD licensed.
 </ul>
 
