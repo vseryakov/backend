@@ -1,47 +1,29 @@
 .navbar {
-  margin-bottom: 20px;
-  border-bottom: 1px solid #ccc;
+ 	margin-bottom: 20px;
+ 	border-bottom: 1px solid #ccc;
 }
 
 body {
 	font-family: "Avenir Next", Helvetica, Arial, sans-serif;
+        font-size: 1em;
 	padding:1em;
 	margin:auto;
 	max-width:80%;
 	background:#fefefe;
 }
 
-h1, h2, h3, h4, h5, h6 {
-	font-weight: bold;
-}
-
 h1 {
 	color: #000000;
-	font-size: 28pt;
 }
 
 h2 {
 	border-bottom: 1px solid #CCCCCC;
 	color: #000000;
-	font-size: 24px;
-}
-
-h3 {
-	font-size: 18px;
-}
-
-h4 {
-	font-size: 16px;
-}
-
-h5 {
-	font-size: 14px;
 }
 
 h6 {
 	color: #777777;
 	background-color: inherit;
-	font-size: 14px;
 }
 
 hr {
@@ -65,26 +47,15 @@ a, a:visited {
 	text-decoration: none;
 }
 
-#message {
-	border-radius: 6px;
-	border: 1px solid #ccc;
-	display:block;
-	width:100%;
-	height:60px;
-	margin:6px 0px;
-}
-
-button, #ws {
-	font-size: 10pt;
+button {
 	padding: 4px 6px;
 	border-radius: 5px;
 	border: 1px solid #bbb;
 	background-color: #eee;
 }
 
-code, pre, #ws, #message {
+code, pre {
 	font-family: Monaco;
-	font-size: 11pt;
 	border-radius: 3px;
 	background-color: #F8F8F8;
 	color: inherit;
@@ -96,9 +67,12 @@ code {
 	padding: 0 5px;
 }
 
-p > code {
-    font-size: 13pt;
-    font-family: "Avenir Next", Helvetica, Arial, sans-serif;
+li p:first-child code:first-child {
+	font-size: 1.3em;
+	font-family: "Avenir Next", Helvetica, Arial, sans-serif;
+	font-weight: 500;
+        background-color: inherit;
+        border: inherit;
 }
 
 pre {
@@ -113,8 +87,3 @@ pre > code {
 	padding: 0;
 }
 
-#ws { background-color: #f8f8f8; }
-
-.send { color:#77bb77; }
-.server { color:#7799bb; }
-.error { color:#AA0000; }
